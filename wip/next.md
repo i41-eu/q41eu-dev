@@ -2,6 +2,9 @@
 
 Plans, not features yet (docs only describe what exists).
 
+The site at dev.q41.eu, every robot feature in the API and the dev package's helpers:
+[design-site.md](design-site.md) (it covers items 1 and 4 below in more detail).
+
 1. **Apps on the kit.** Focus moves its robot plumbing to `robothub` and its chimes to `sound`
    (branch `dev-kit` in q41eu-focus, waiting for a tagged q41eu-dev). Then the pet (its
    `robotconn.go`, `ledColor`, `sound`, and its touch rules into `gesture`), sbot, and raw (raw

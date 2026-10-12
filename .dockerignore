@@ -1,0 +1,13 @@
+*
+!go.mod
+!go.sum
+!cmd
+!internal
+!robothub
+!robot
+!screen
+!sound
+!leds
+!gesture
+!client
+!examples

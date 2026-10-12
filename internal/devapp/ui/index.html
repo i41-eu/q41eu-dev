@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stackchan Dev</title>
+<style>
+  :root {
+    --bg: #f4f6ff; --card: #ffffff; --text: #1e2355; --muted: #5a618e; --accent: #7d8cff; --accent-text: #ffffff;
+    --soft: #e8ebff; --link: #3446c9; --ok: #1f9d55; --off: #9aa0bd; --border: #dce1f5; --code: #eef1ff; --warn: #b45309;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12142a; --card: #1c1f3d; --text: #e8eaff; --muted: #a3a8cc; --accent: #7d8cff; --accent-text: #0e1030;
+      --soft: #262a52; --link: #aab4ff; --ok: #4ade80; --off: #6b7094; --border: #2c3060; --code: #151834; --warn: #fbbf24;
+    }
+  }
+  * { box-sizing: border-box; }
+  a { color: var(--link); }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 8px; }
+  p { margin: 0 0 10px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; }
+  .box { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--bg); min-width: 0; }
+  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--off); flex: none; }
+  .dot.on { background: var(--ok); }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .meta { color: var(--muted); font-size: 0.85rem; margin-left: auto; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 8px 14px; background: var(--accent); color: var(--accent-text); cursor: pointer; }
+  button.soft { background: var(--soft); color: var(--text); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  input[type=text], select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); min-width: 0; }
+  input[type=text] { flex: 1; }
+  input[type=color] { width: 44px; height: 38px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 2px; }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+  .muted { color: var(--muted); font-size: 0.88rem; }
+  .out { font: 0.85rem/1.4 ui-monospace, monospace; color: var(--muted); margin-top: 6px; min-height: 1.2em; overflow-wrap: anywhere; }
+  pre, code { font: 0.82rem/1.45 ui-monospace, monospace; background: var(--code); border-radius: 8px; }
+  code { padding: 1px 5px; }
+  pre { padding: 10px; overflow-x: auto; margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .key { border: 2px solid var(--accent); border-radius: 12px; padding: 10px; margin-top: 8px; }
+  .events { list-style: none; margin: 0; padding: 0; font-variant-numeric: tabular-nums; font-size: 0.9rem; max-height: 320px; overflow-y: auto; }
+  .events li { padding: 3px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+  .events li.act { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  td { padding: 4px 6px 4px 0; border-top: 1px solid var(--border); vertical-align: top; }
+  details summary { cursor: pointer; font-weight: 600; margin: 4px 0; }
+  nav.top { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin-bottom: 12px; font-size: 0.95rem; }
+  nav.top a { color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; min-height: 28px; }
+  nav.top a.here { color: var(--text); font-weight: 600; }
+  nav.top .acct { margin-left: auto; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  [hidden] { display: none !important; }
+  .steps { margin: 0 0 10px; padding-left: 20px; } .steps li { margin: 4px 0; }
+  .ex { border-top: 1px solid var(--border); padding: 10px 0; }
+  .ex h3 { margin: 0; font-size: 1rem; } .tabs { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+  .tabs button { padding: 4px 10px; font-size: 0.85rem; } .tabs button.on { background: var(--accent); color: var(--accent-text); }
+  .ex pre { max-height: 320px; overflow: auto; }
+  .foot { color: var(--muted); font-size: 0.85rem; margin: 28px 0 8px; line-height: 1.6; max-width: 700px; }
+  .foot a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <nav class="top"><a href="/" class="here">Dev</a><a id="mgrLink" hidden target="_blank" rel="noopener">Your robots (manager)</a><span class="acct" id="acct"></span></nav>
+  <h1>Stackchan Dev</h1>
+  <p class="sub">Your robot from your own programs and AI agents: show text, ask a question, light the LEDs, play a sound, hear what people do at it. One key per robot, made here.</p>
+  <div id="robots"></div>
+  <div class="card" id="empty" hidden>
+    <p>No robot is paired with this browser yet.</p>
+    <p id="signinHint" hidden><a href="/auth/login?next=/">Sign in</a> with your account at the robots' manager: the robots you set up there with Dev show here at once, no QR code.</p>
+    <p>Or on the robot, switch to <b>Dev</b> (swipe up, <b>QR</b>, Next, Connect) and scan its QR code with this device.</p>
+    <p id="mgrHint" hidden>A new robot, or Dev not among its apps? Add it on <a id="mgrLink2" target="_blank" rel="noopener">its manager</a> (over USB for a new robot).</p>
+  </div>
+  <div class="card">
+    <h2>Start here</h2>
+    <ol class="steps">
+      <li>Give your robot Dev as one of its apps (on <a href="https://m.i41.eu">m.i41.eu</a>, or your home manager). Signed in there, this page shows your robot at once (<b>Sign in</b> at the top); or switch the robot to Dev (swipe up, <b>QR</b>, Next, Connect) and scan its QR code.</li>
+      <li><b>New key</b> on the robot's card below: it shows the three variables for your shell, <code>SDEV_URL</code>, <code>SDEV_ROBOT</code>, <code>SDEV_KEY</code>.</li>
+      <li>Run the examples below here with <b>Run</b>, then on your computer: curl, Python or Go.</li>
+    </ol>
+    <p>The whole way, with the robot's setup over USB: <a href="https://github.com/i41-eu/q41eu-dev/blob/main/docs/getting-started.md" target="_blank" rel="noopener">getting started</a>. All examples: <a href="https://github.com/i41-eu/q41eu-dev/tree/main/examples" target="_blank" rel="noopener">examples/</a>.</p>
+  </div>
+  <div class="card">
+    <h2>Examples</h2>
+    <p class="muted">Each runs here on your robot (<b>Run</b>), and the same as a script on your computer with the three variables set. <span id="exRobot"></span></p>
+    <div id="examples"></div>
+  </div>
+  <div class="card">
+    <h2>The API</h2>
+    <p>Every action is <code>POST /v1/robots/&lt;robot&gt;/&lt;action&gt;</code> with a JSON object, and the same action is the MCP tool <code>robot_&lt;action&gt;</code> at <code>/mcp</code> (for AI agents). The key goes in <code>Authorization: Bearer sdev_…</code>. Also: <code>GET /v1/robots</code>, <code>GET /v1/robots/&lt;robot&gt;</code> (its state), <code>GET /v1/robots/&lt;robot&gt;/events?after=&lt;seq&gt;&amp;seconds=30</code> (waits for the next thing a person does), <code>GET /v1/actions</code> (this list as JSON), and <a href="/v1/openapi.json">/v1/openapi.json</a>: the whole API as OpenAPI 3.1, for any OpenAPI tool or a client generator.</p>
+    <div id="actions"></div>
+    <p class="muted" id="evnames"></p>
+  </div>
+  <footer class="foot">
+    Open source, a proof of concept: <a href="https://github.com/i41-eu/q41eu-dev">q41eu-dev</a> (this app and the Go kit apps build on) ·
+    the robot's <a href="https://github.com/i41-eu/i41eu-embody/tree/main">Embody Mode firmware</a> ·
+    part of <a href="https://github.com/i41-eu/i41eu-arch">i41eu-arch</a> · <a href="https://github.com/sponsors/mj41">sponsor mj41</a><br>
+    Stack-chan (スタックチャン) is a registered trademark of Shinya Ishikawa; this project is independent and only made to work with Stack-chan robots.
+  </footer>
+</main>
+<script>
+"use strict";
+const el = (tag, props = {}, kids = []) => { const e = Object.assign(document.createElement(tag), props); for (const k of kids) if (k != null && k !== false) e.append(k); return e; };
+const cards = new Map(); // robot id -> {root, update, addEvent}
+let info = { actions: [], public_url: location.origin };
+
+async function call(id, action, body) {
+  const res = await fetch(`/v1/robots/${encodeURIComponent(id)}/${action}`, {
+    method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "dev" }, body: JSON.stringify(body || {}),
+  });
+  const j = await res.json().catch(() => ({ ok: false, error: res.statusText }));
+  if (!res.ok || j.ok === false) throw new Error(j.error || res.statusText);
+  return j;
+}
+
+function base() { return (info.public_url || location.origin).replace(/\/$/, ""); }
+
+function makeCard(r) {
+  const c = { id: r.id };
+  const dot = el("span", { className: "dot" }), meta = el("span", { className: "meta" });
+  const out = el("div", { className: "out" });
+  const run = (action, body, label) => {
+    out.textContent = "→ " + (label || action) + "…";
+    return call(c.id, action, body).then((j) => {
+      const { ok, ...rest } = j;
+      out.textContent = "✓ " + (label || action) + (Object.keys(rest).length ? " " + JSON.stringify(rest) : "");
+      return j;
+    }).catch((e) => { out.textContent = "✗ " + e.message; });
+  };
+
+  // Try it: each control is one action, as a program would send it.
+  const text = el("input", { type: "text", placeholder: "Text for the screen", value: "Hello from Dev" });
+  const color = el("input", { type: "color", value: "#7d8cff", title: "Colour for cards and LEDs" });
+  const say = el("input", { type: "text", placeholder: "Speech bubble", value: "Hi!" });
+  const bar = el("input", { type: "range", min: 0, max: 100, value: 50, ariaLabel: "LED bar" });
+  const notes = el("input", { type: "text", value: "C5:120 E5:120 G5:300" });
+  const chime = el("select", {}, []);
+  const question = el("input", { type: "text", value: "Coffee or tea?" });
+  const answers = el("input", { type: "text", value: "Coffee, Tea" });
+  const tryit = el("div", { className: "box" }, [
+    el("h2", { textContent: "Try it" }),
+    el("div", { className: "row" }, [text, color, el("button", { textContent: "Show", onclick: () => run("show", { text: text.value, color: color.value }, "show") }),
+      el("button", { className: "soft", textContent: "Clear", onclick: () => run("show", { clear: true }, "clear") })]),
+    el("div", { className: "row" }, [say, el("button", { textContent: "Say", onclick: () => run("say", { text: say.value }) })]),
+    el("div", { className: "row" }, [...["happy", "sad", "doubt", "sleepy", "neutral"].map((e) => el("button", { className: "soft", textContent: e, onclick: () => run("face", { emotion: e }, e) })),
+      el("button", { className: "soft", textContent: "readings", title: "The robot's own sensors on its screen", onclick: () => run("face", { view: "readings" }, "readings") })]),
+    el("div", { className: "row" }, ["nod", "shake", "home"].map((g) => el("button", { className: "soft", textContent: g, onclick: () => run("move", { gesture: g }, g) }))),
+    el("div", { className: "row" }, [el("span", { className: "muted", textContent: "LEDs" }), bar,
+      el("button", { className: "soft", textContent: "Bar", onclick: () => run("leds", { bar: bar.value / 100, color: color.value }, "LED bar") }),
+      el("button", { className: "soft", textContent: "Rainbow", onclick: () => run("leds", { effect: "rainbow", seconds: 5 }, "rainbow") }),
+      el("button", { className: "soft", textContent: "Off", onclick: () => run("leds", { off: true }, "LEDs off") })]),
+    el("div", { className: "row" }, [chime, el("button", { className: "soft", textContent: "Chime", onclick: () => run("sound", { chime: chime.value }, chime.value) })]),
+    el("div", { className: "row" }, [notes, el("button", { className: "soft", textContent: "Play", onclick: () => run("sound", { notes: notes.value }, "notes") })]),
+    el("div", { className: "row" }, [question, answers, el("button", { textContent: "Ask", onclick: () => run("ask", { question: question.value,
+      answers: answers.value.split(",").map((s) => s.trim()).filter(Boolean), timeout_s: 30 }, "ask (tap an answer on the robot)") })]),
+    out,
+  ]);
+  c.fillChimes = () => { if (!chime.options.length) for (const n of info.chimes || []) chime.append(el("option", { value: n, textContent: n })); };
+
+  // Keys
+  const keys = el("div"), fresh = el("div");
+  const keyName = el("input", { type: "text", placeholder: "Key name, e.g. laptop or claude", value: "" });
+  const keyBox = el("div", { className: "box" }, [el("h2", { textContent: "Keys" }),
+    el("p", { className: "muted", textContent: "A key lets a program or an AI agent use this robot through the API. Anyone with it can show things, move the head and hear what people do at the robot: keep it like a password. It is shown once." }),
+    el("div", { className: "row" }, [keyName, el("button", { textContent: "New key", onclick: async () => {
+      try {
+        const res = await fetch("/api/keys", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "dev" }, body: JSON.stringify({ robot: c.id, name: keyName.value }) });
+        const j = await res.json();
+        if (!j.ok) throw new Error(j.error);
+        keyName.value = "";
+        showKey(j.key);
+        load();
+      } catch (e) { fresh.textContent = e.message; }
+    } })]), fresh, keys]);
+  const showKey = (key) => {
+    const u = base(), id = c.id;
+    fresh.replaceChildren(el("div", { className: "key" }, [
+      el("div", { className: "muted", textContent: "Your new key (copy it now, it is not shown again):" }),
+      el("pre", { textContent: key }),
+      el("div", { className: "muted", textContent: "For your shell (the examples read these):" }),
+      el("pre", { textContent: `export SDEV_URL=${u}\nexport SDEV_ROBOT=${id}\nexport SDEV_KEY=${key}` }),
+      el("div", { className: "muted", textContent: "Then, in a clone of github.com/i41-eu/q41eu-dev:" }),
+      el("pre", { textContent: "sh examples/curl/hello.sh\npython3 examples/python/hello.py\ngo run ./examples/go/hello" }),
+      el("div", { className: "muted", textContent: "Give it to an AI agent (MCP), e.g. Claude Code:" }),
+      el("pre", { textContent: `claude mcp add --transport http stackchan ${u}/mcp --header "Authorization: Bearer ${key}"` }),
+    ]));
+  };
+  c.renderKeys = (list) => keys.replaceChildren(...list.filter((k) => k.robot === c.id).map((k) => el("div", { className: "row" }, [
+    el("span", { textContent: k.name }), el("code", { textContent: k.id }),
+    el("span", { className: "muted", textContent: "made " + new Date(k.created).toLocaleDateString() + (k.last_used ? " · used " + new Date(k.last_used).toLocaleString() : " · not used yet") }),
+    el("button", { className: "soft", textContent: "Delete", onclick: async () => {
+      if (!confirm(`Delete the key ${k.name}? Programs using it stop working.`)) return;
+      await fetch("/api/keys/" + k.id, { method: "DELETE", headers: { "X-Requested-With": "dev" } });
+      load();
+    } }),
+  ])));
+
+  // Events: what people do at the robot, and what programs ask of it
+  const events = el("ul", { className: "events" });
+  c.addEvent = (text, act) => {
+    events.prepend(el("li", { className: act ? "act" : "", textContent: new Date().toLocaleTimeString() + "  " + text }));
+    while (events.children.length > 60) events.lastChild.remove();
+  };
+  const evBox = el("div", { className: "box" }, [el("h2", { textContent: "Events" }),
+    el("p", { className: "muted", textContent: "Tap the robot's screen, touch its head, hold a tag near it. Grey: what programs asked." }), events]);
+
+  c.root = el("section", { className: "card" }, [el("div", { className: "head" }, [dot, el("span", { className: "name", textContent: r.id }), meta]),
+    el("div", { className: "grid" }, [tryit, keyBox, evBox])]);
+  c.update = (r) => {
+    dot.className = "dot" + (r.online ? " on" : "");
+    meta.textContent = r.online ? `online · ${r.model || ""} · firmware ${r.firmware || "?"}` : "offline";
+    tryit.querySelectorAll("button").forEach((b) => { b.disabled = !r.online; });
+  };
+  return c;
+}
+
+function upsert(r) {
+  let c = cards.get(r.id);
+  if (!c) {
+    c = makeCard(r);
+    cards.set(r.id, c);
+    document.getElementById("robots").append(c.root);
+  }
+  c.fillChimes();
+  c.update(r);
+}
+
+// The examples (examples/ in the repository): their files to read, and Run, which does here what
+// the script does on a computer (call = the same action through this page).
+const EXAMPLES = [
+  { id: "hello", title: "hello", what: "a card, green LEDs, a nod, a chime",
+    files: { curl: "curl/hello.sh", python: "python/hello.py", go: "go/hello/main.go" },
+    run: async (call) => {
+      await call("show", { title: "Hello", text: "from the page", note: "q41eu-dev examples", color: "green" });
+      await call("leds", { color: "green" }); await call("move", { gesture: "nod" }); await call("sound", { chime: "tada" });
+      return "done: look at the robot";
+    } },
+  { id: "ask", title: "ask", what: "a question with buttons on the robot; the answer tapped there comes back",
+    files: { curl: "curl/ask.sh", python: "python/ask.py", go: "go/ask/main.go" },
+    run: async (call, log) => {
+      log("waiting up to 30 s for a tap on the robot…");
+      const r = await call("ask", { question: "Coffee or tea?", answers: ["Coffee", "Tea"] });
+      return r.answer || "no answer within 30 s";
+    } },
+  { id: "build", title: "build status", what: "around any command (your tests): blue while it runs, then green and a chime, or red and a shake",
+    files: { python: "python/build_status.py", go: "go/buildstatus/main.go" },
+    run: async (call, log) => {
+      await call("show", { title: "Running", text: "make test", color: "blue" });
+      await call("leds", { effect: "breathe", color: "blue" });
+      log("here a 3 s pause stands in for your command…");
+      await new Promise((ok) => setTimeout(ok, 3000));
+      await call("show", { title: "Passed", text: "All good", note: "make test · 3 s", color: "green", progress: 1 });
+      await call("leds", { color: "green" }); await call("sound", { chime: "tada" }); await call("move", { gesture: "nod" });
+      return "passed";
+    } },
+  { id: "events", title: "events", what: "what people do at the robot; a pat makes it chirp and smile, a tag shows its text",
+    files: { curl: "curl/events.sh", python: "python/events.py", go: "go/events/main.go" },
+    run: async (call, log, events) => {
+      let last = (await events(0, 0)).last_seq;
+      log("for 30 s, touch the robot: tap its screen, pat its head, hold a tag near it…");
+      // Listens the whole time, as the programs do: a hand bringing a tag brushes the head
+      // (stroke) before the tag is read, and the tag must still count.
+      const end = Date.now() + 30000, seen = [];
+      while (Date.now() < end) {
+        const got = await events(last, Math.max(1, Math.round((end - Date.now()) / 1000)));
+        if (got.last_seq === undefined) throw new Error(got.error || "events failed");
+        last = got.last_seq;
+        for (const e of got.events) {
+          seen.push(e.name);
+          log(e.name + " " + JSON.stringify(e.data || {}));
+          if (["pat", "pet", "stroke"].includes(e.name)) { await call("face", { emotion: "happy" }); await call("sound", { chime: "chirp" }); }
+          if (e.name === "tag") await call("show", { title: "A tag", text: (e.data || {}).text || "(no text)", note: (e.data || {}).uid || "" });
+          if (e.name === "tap") await call("show", { clear: true });
+        }
+      }
+      return seen.length ? seen.length + " event(s): " + [...new Set(seen)].join(", ") : "nothing within 30 s";
+    } },
+];
+
+function renderExamples() {
+  const box = document.getElementById("examples");
+  if (box.childElementCount) return;
+  for (const ex of EXAMPLES) {
+    const code = el("pre", { textContent: "…" }), out = el("div", { className: "out" });
+    const tabs = el("div", { className: "tabs" });
+    const show = async (lang) => {
+      tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.textContent === lang));
+      const f = ex.files[lang];
+      code.textContent = await fetch("/examples/" + f).then((r) => r.text()).catch(() => "(not found)");
+      dl.href = "/examples/" + f; dl.download = f.split("/").pop() === "main.go" ? ex.id + ".go" : f.split("/").pop();
+    };
+    for (const lang of Object.keys(ex.files)) tabs.append(el("button", { className: "soft", textContent: lang, onclick: () => show(lang) }));
+    const dl = el("a", { textContent: "download", className: "muted" });
+    const runBtn = el("button", { textContent: "Run", onclick: async () => {
+      const id = [...cards.keys()][0];
+      if (!id) { out.textContent = "pair a robot first"; return; }
+      runBtn.disabled = true;
+      const lines = [];
+      const log = (t) => { lines.push(t); out.textContent = lines.join("\n"); };
+      const evs = (after, seconds) => fetch(`/v1/robots/${encodeURIComponent(id)}/events?after=${after}&seconds=${seconds}`,
+        { headers: { "X-Requested-With": "dev" } }).then((r) => r.json());
+      try { log("✓ " + await ex.run((action, body) => call(id, action, body), log, evs)); }
+      catch (e) { log("✗ " + e.message); }
+      runBtn.disabled = false;
+    } });
+    box.append(el("div", { className: "ex" }, [el("div", { className: "row" }, [el("h3", { textContent: ex.title }),
+      el("span", { className: "muted", textContent: ex.what })]), tabs, code, el("div", { className: "row" }, [runBtn, dl]), out]));
+    show(Object.keys(ex.files)[0]);
+  }
+}
+
+// The top bar: the robots' manager, and the account (sign-in through the manager).
+function renderMe(me) {
+  for (const id of ["mgrLink", "mgrLink2"]) {
+    const a = document.getElementById(id);
+    if (me.manager_url) { a.href = me.manager_url + "/"; a.hidden = false; }
+  }
+  document.getElementById("mgrHint").hidden = !me.manager_url;
+  document.getElementById("signinHint").hidden = !me.sign_in || !!me.signed_in;
+  const acct = document.getElementById("acct");
+  if (!me.sign_in) { acct.replaceChildren(); return; }
+  if (me.signed_in) {
+    acct.replaceChildren(el("span", { textContent: me.name || "signed in" }), el("a", { href: "#", textContent: "Sign out", onclick: async (e) => {
+      e.preventDefault();
+      await fetch("/auth/logout", { method: "POST", headers: { "X-Requested-With": "dev" } });
+      location.href = "/?signin=no";
+    } }));
+  } else {
+    acct.replaceChildren(el("a", { href: "/auth/login?next=/", textContent: "Sign in" }));
+  }
+}
+
+function renderActions() {
+  const rows = info.actions.map((a) => el("details", {}, [el("summary", { textContent: a.name + " — " + a.help.split(/ \(|: |\. /)[0] }),
+    el("p", { className: "muted", textContent: a.help }),
+    a.params.length ? el("table", {}, a.params.map((p) => el("tr", {}, [el("td", {}, [el("code", { textContent: p.name })]),
+      el("td", { className: "muted", textContent: p.type + (p.required ? ", required" : "") + (p.enum ? ": " + p.enum.join(", ") : "") }),
+      el("td", { textContent: p.help })]))) : el("p", { className: "muted", textContent: "No arguments." })]));
+  document.getElementById("actions").replaceChildren(...rows);
+  document.getElementById("evnames").textContent = "Events: " + (info.events || []).join(", ") + ".";
+}
+
+async function load() {
+  const j = await fetch("/api/state").then((r) => r.json());
+  info = j;
+  info.chimes = (j.actions.find((a) => a.name === "sound")?.params.find((p) => p.name === "chime")?.enum) || [];
+  for (const r of j.robots) upsert(r);
+  for (const c of cards.values()) c.renderKeys(j.keys || []);
+  document.getElementById("empty").hidden = j.robots.length > 0;
+  renderActions();
+  renderExamples();
+  renderMe(j.me || {});
+  document.getElementById("exRobot").textContent = cards.size ? "Run uses " + [...cards.keys()][0] + "." : "Pair a robot to run them.";
+}
+
+function connect() {
+  const es = new EventSource("/api/events");
+  es.addEventListener("robot", (ev) => { const r = JSON.parse(ev.data); if (cards.has(r.id)) upsert(r); });
+  es.addEventListener("event", (ev) => {
+    const e = JSON.parse(ev.data), c = cards.get(e.robot);
+    if (c) c.addEvent(e.event.name + (e.event.data ? " " + JSON.stringify(e.event.data) : "") + `  #${e.event.seq}`);
+  });
+  es.addEventListener("action", (ev) => {
+    const e = JSON.parse(ev.data), c = cards.get(e.robot);
+    if (c) c.addEvent(`→ ${e.action} ${JSON.stringify(e.args)} (${e.by})`, true);
+  });
+  es.onerror = () => { es.close(); setTimeout(connect, 3000); };
+}
+
+load().then(() => { if (cards.size) connect(); });
+setInterval(() => load().catch(() => {}), 15000);
+</script>
+</body>
+</html>

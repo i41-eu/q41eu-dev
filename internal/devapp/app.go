@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -36,7 +37,7 @@ type Config struct {
 	ManagerURL   string            // the manager's page, linked from Dev's ("" = none)
 	PublicURL    string            // base URL browsers and API clients use
 	State        statestore.Store  // pairings and keys; nil = in memory only
-	UIDir        string            // development: serve the page from this directory
+	UIDir        string            // development: render the site from this directory (internal/devapp/site) on every request
 	// TrustedProxies: reverse proxies in front that append the client's address to
 	// X-Forwarded-For (limits per address use it); 0 trusts no header.
 	TrustedProxies int
@@ -59,6 +60,9 @@ type App struct {
 	actions   *buckets       // per key or browser
 	pairFails *buckets       // wrong pairing codes per address
 	streams   map[string]int // open page streams per address (a.mu)
+
+	site    *site // the pages, rendered at start (site.go)
+	siteErr error
 }
 
 // state is what is saved.
@@ -126,6 +130,10 @@ func New(cfg Config) *App {
 	})
 	if err := a.load(); err != nil {
 		a.log.Error("state not loaded: starting empty", "err", err)
+	}
+	files, _ := fs.Sub(siteFiles, "site")
+	if a.site, a.siteErr = buildSite(files); a.siteErr != nil {
+		a.log.Error("the site's pages", "err", a.siteErr)
 	}
 	return a
 }
@@ -238,11 +246,18 @@ func pairingID(sid string) string {
 	return hex.EncodeToString(h[:8])
 }
 
-// Handler is everything: the robots' endpoint, the page, the API, MCP.
+// Handler is everything: the robots' endpoint, the site, the API, MCP.
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET "+wire.ConnectPath, a.hub)
-	mux.HandleFunc("GET /{$}", a.trySignIn(a.handleIndex))
+	for _, p := range sitePages {
+		pattern := "GET " + p.Path
+		if p.Path == "/" {
+			pattern = "GET /{$}"
+		}
+		mux.HandleFunc(pattern, a.trySignIn(a.handlePage))
+	}
+	mux.HandleFunc("GET /site/{file}", a.handleSiteFile)
 	mux.HandleFunc("GET /pair", a.handlePair)
 	mux.HandleFunc("GET /auth/login", a.handleLogin)
 	mux.HandleFunc("GET /auth/sso", a.handleSSOReturn)

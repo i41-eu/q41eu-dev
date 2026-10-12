@@ -1,0 +1,94 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{if eq .Page.Path "/"}}{{.Page.Title}}{{else}}{{.Page.Title}} · Stackchan Dev{{end}}</title>
+<script>
+// The languages picked (this browser's, or ?lang= for this page), as classes on <html> before
+// the first paint: the CSS hides the code of the others. site.js keeps them in step.
+(function () {
+  var all = {{.LangIDs}}, langs = null, fromURL = false, tabs = false, tab = "";
+  var known = function (l) { return all.indexOf(l) >= 0; };
+  try {
+    var saved = JSON.parse(localStorage.getItem("dev.langs") || "null");
+    if (Array.isArray(saved)) langs = saved.filter(known);
+    tabs = localStorage.getItem("dev.layout") === "tabs";
+    tab = localStorage.getItem("dev.tab") || "";
+  } catch (e) { /* no storage here: every language, every time */ }
+  var q = new URLSearchParams(location.search).get("lang");
+  if (q) {
+    var asked = q.toLowerCase().split(",").map(function (l) { l = l.trim(); return l === "javascript" ? "js" : l; });
+    var picked = all.filter(function (l) { return asked.indexOf(l) >= 0; });
+    if (picked.length) { langs = picked; fromURL = true; }
+  }
+  if (!langs || !langs.length) langs = all.slice();
+  if (langs.indexOf(tab) < 0) tab = langs[0];
+  var c = ["scripted", "langsel", "tab-" + tab].concat(langs.map(function (l) { return "lang-" + l; }));
+  if (tabs) c.push("tabs");
+  document.documentElement.className = c.join(" ");
+  window.devLangs = { all: all, langs: langs, fromURL: fromURL, tabs: tabs, tab: tab };
+})();
+</script>
+<style>
+{{.CSS}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="top">
+  <div class="bar">
+    <nav class="pages" aria-label="Pages">{{range .Pages}}<a href="{{.Path}}"{{if eq .Path "/"}} class="brand"{{end}}{{if eq .Path $.Page.Path}} aria-current="page"{{end}}>{{.Nav}}</a>{{end}}</nav>
+    <span class="acct" id="acct"></span>
+  </div>
+  <div class="bar">
+    <fieldset class="chips" id="langs">
+      <legend class="sr-only">Show the code in these languages</legend>
+      <span class="lbl" aria-hidden="true">Code in</span>
+      {{range .Langs}}<label class="chip"><input type="checkbox" name="lang" value="{{.ID}}" checked>{{.Name}}</label>
+      {{end}}<button type="button" class="soft small" id="tabsBtn" aria-pressed="false" title="One language at a time, in tabs">Tabs</button>
+      <button type="button" class="small" id="keepBtn" hidden>Keep this choice</button>
+    </fieldset>
+  </div>
+</header>
+<main id="main">
+{{template "main" .}}
+</main>
+<footer class="foot">
+  <p>Open source, a proof of concept: <a href="https://github.com/i41-eu/q41eu-dev">q41eu-dev</a> (this app and the Go kit apps build on) ·
+  the robot's <a href="https://github.com/i41-eu/i41eu-StackChan/tree/embody">Embody Mode firmware</a> ·
+  part of <a href="https://github.com/i41-eu/i41eu-arch">i41eu-arch</a> · <a href="https://github.com/sponsors/mj41">sponsor mj41</a></p>
+  <p>Stack-chan (スタックチャン) was created by Shinya Ishikawa and the Stack-chan community (<a href="https://github.com/stack-chan/stack-chan">github.com/stack-chan/stack-chan</a>); this project is independent of it and of M5Stack.</p>
+</footer>
+<script src="/site/site.js" defer></script>
+{{if eq .Page.Path "/robots"}}<script src="/site/robots.js" defer></script>
+{{end}}</body>
+</html>
+{{end}}
+
+{{/* code: one group of code blocks, a block per language */}}
+{{define "code"}}<div class="langs">
+<div class="tabbar" role="group" aria-label="Language">{{range .}}<button type="button" class="tab" data-lang="{{.Lang}}" aria-pressed="false">{{.LangName}}</button>{{end}}</div>
+{{range .}}<figure class="code" data-lang="{{.Lang}}">
+<figcaption><b>{{.LangName}}</b>{{if .Usage}} <code class="usage">{{.Usage}}</code>{{end}}<span class="tools">{{if not .Missing}}<button type="button" class="soft copy" aria-label="Copy the {{.LangName}} code">Copy</button>{{end}}{{if .File}}<a href="/examples/{{.File}}" download="{{.Download}}">Download</a>{{end}}</span></figcaption>
+{{if .Missing}}<p class="missing muted">Not in {{.LangName}} yet.</p>{{else}}<pre><code>{{.Code}}</code></pre>{{end}}
+</figure>
+{{end}}</div>{{end}}
+
+{{/* exbody: an example's parts, Run and its code */}}
+{{define "exbody"}}<p class="tags">{{range .Parts}}<a class="tag" href="/docs/api#{{.ID}}">{{.Name}}</a>{{end}}</p>
+<div class="row"><button type="button" class="run" data-run="{{.ID}}">Run</button><span class="muted runwho">it on your robot from this page</span></div>
+<pre class="out" aria-live="polite" hidden></pre>
+<div class="wide">{{template "code" .Blocks}}</div>{{end}}
+
+{{/* action: one action of the API, its arguments and a call in every language */}}
+{{define "action"}}<article class="action">
+<h3 id="{{.Name}}"><code>{{.Name}}</code></h3>
+<p>{{.Help}}</p>
+{{if .Params}}<div class="tablewrap"><table>
+<caption class="sr-only">The arguments of {{.Name}}</caption>
+<thead><tr><th scope="col">Argument</th><th scope="col">Type</th><th scope="col">What it does</th></tr></thead>
+<tbody>{{range .Params}}<tr id="{{$.Name}}-{{.Name}}"><td><code>{{.Name}}</code></td><td>{{.Type}}{{if .Required}}, required{{end}}{{if .Enum}}: {{join .Enum ", "}}{{end}}</td><td>{{.Help}}</td></tr>{{end}}</tbody>
+</table></div>{{else}}<p class="muted">No arguments.</p>{{end}}
+{{template "code" .Blocks}}
+</article>{{end}}

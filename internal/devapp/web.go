@@ -1,15 +1,12 @@
 package devapp
 
 import (
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
-	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -18,9 +15,6 @@ import (
 	"github.com/i41-eu/q41eu-dev/examples"
 	"github.com/i41-eu/q41eu-dev/robot"
 )
-
-//go:embed ui/index.html
-var ui embed.FS
 
 // handleExample serves an example's file (examples/), as text, to read or download.
 func (a *App) handleExample(w http.ResponseWriter, r *http.Request) {
@@ -55,23 +49,6 @@ func writeErr(w http.ResponseWriter, err error) {
 	writeJSON(w, status, map[string]any{"ok": false, "error": err.Error()})
 }
 
-func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
-	var b []byte
-	var err error
-	if a.cfg.UIDir != "" {
-		b, err = os.ReadFile(filepath.Join(a.cfg.UIDir, "index.html"))
-	} else {
-		b, err = ui.ReadFile("ui/index.html")
-	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Write(b)
-}
-
 // handlePair: the robot's QR code. The browser gets a session (a cookie) with the robot.
 func (a *App) handlePair(w http.ResponseWriter, r *http.Request) {
 	ip := a.clientIP(r)
@@ -94,7 +71,7 @@ func (a *App) handlePair(w http.ResponseWriter, r *http.Request) {
 	a.mu.Unlock()
 	a.log.Info("browser paired", "robot", id)
 	a.hub.TellPaired(id)
-	http.Redirect(w, r, "/?paired="+id, http.StatusSeeOther)
+	http.Redirect(w, r, "/robots?paired="+id, http.StatusSeeOther)
 }
 
 // device is a short name for a browser, from its user agent (for the manager's page).

@@ -1,0 +1,80 @@
+{
+  "examples": [
+    {
+      "id": "hello",
+      "title": "hello",
+      "what": "a card, green LEDs, a nod, a chime",
+      "tags": ["screen", "head", "lights", "speaker"],
+      "files": {
+        "curl": "curl/hello.sh",
+        "python": "python/hello.py",
+        "js": "js/hello.mjs",
+        "go": "go/hello/main.go",
+        "mcp": "mcp/hello.txt"
+      },
+      "run": {
+        "curl": "sh examples/curl/hello.sh",
+        "python": "python3 examples/python/hello.py",
+        "js": "node examples/js/hello.mjs",
+        "go": "go run ./examples/go/hello"
+      }
+    },
+    {
+      "id": "ask",
+      "title": "ask",
+      "what": "a question with buttons on the robot; the answer tapped there comes back",
+      "tags": ["asking", "screen"],
+      "files": {
+        "curl": "curl/ask.sh",
+        "python": "python/ask.py",
+        "js": "js/ask.mjs",
+        "go": "go/ask/main.go",
+        "mcp": "mcp/ask.txt"
+      },
+      "run": {
+        "curl": "sh examples/curl/ask.sh",
+        "python": "python3 examples/python/ask.py \"Deploy?\" Yes No",
+        "js": "node examples/js/ask.mjs \"Deploy?\" Yes No",
+        "go": "go run ./examples/go/ask \"Deploy?\" Yes No"
+      }
+    },
+    {
+      "id": "build",
+      "title": "build status",
+      "what": "around any command (your tests): blue while it runs, then green and a chime, or red and a shake",
+      "tags": ["screen", "lights", "speaker", "head"],
+      "files": {
+        "curl": "curl/build_status.sh",
+        "python": "python/build_status.py",
+        "js": "js/build_status.mjs",
+        "go": "go/buildstatus/main.go",
+        "mcp": "mcp/build_status.txt"
+      },
+      "run": {
+        "curl": "sh examples/curl/build_status.sh make test",
+        "python": "python3 examples/python/build_status.py make test",
+        "js": "node examples/js/build_status.mjs make test",
+        "go": "go run ./examples/go/buildstatus go test ./..."
+      }
+    },
+    {
+      "id": "events",
+      "title": "events",
+      "what": "what people do at the robot; a pat makes it chirp and smile, a tag shows its text",
+      "tags": ["people", "screen", "speaker"],
+      "files": {
+        "curl": "curl/events.sh",
+        "python": "python/events.py",
+        "js": "js/events.mjs",
+        "go": "go/events/main.go",
+        "mcp": "mcp/events.txt"
+      },
+      "run": {
+        "curl": "sh examples/curl/events.sh",
+        "python": "python3 examples/python/events.py",
+        "js": "node examples/js/events.mjs",
+        "go": "go run ./examples/go/events"
+      }
+    }
+  ]
+}

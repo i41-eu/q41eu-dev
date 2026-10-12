@@ -1,0 +1,9 @@
+{{define "main"}}
+<h1>Examples</h1>
+<p class="sub">Whole programs, each in every language. Set the three variables first (a new key on <a href="/robots">Your robots</a> shows them), then run one in a clone of the repository: <code>git clone https://github.com/i41-eu/q41eu-dev &amp;&amp; cd q41eu-dev</code>. <b class="runwho">Run</b><span class="runwho"> does the same from this page, on your robot.</span></p>
+<p class="muted runwho" id="exRobot"></p>
+{{range .Examples}}<section class="card example">
+  <div class="exhead"><h2 id="ex-{{.ID}}">{{.Title}}</h2><span class="muted">{{.What}}</span></div>
+  {{template "exbody" .}}
+</section>
+{{end}}{{end}}

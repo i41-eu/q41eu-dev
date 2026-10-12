@@ -1,0 +1,65 @@
+{{define "main"}}
+<h1>Getting started</h1>
+<p class="sub">From a Stackchan robot on your desk to your own program (or AI agent) driving it: about ten minutes. You need the robot, a computer with Chrome (for the USB setup), and a phone or the same computer for this site.</p>
+
+<section class="card">
+  <h2 id="robot">1. The robot gets Dev as one of its apps</h2>
+  <p>Dev is an app like Pet or Focus: the robot connects to it, one app at a time.</p>
+  <ul class="links">
+    <li><b>Online (m.i41.eu):</b> sign in at <a href="https://m.i41.eu">m.i41.eu</a>, plug the robot into the computer over USB and set it up (one button: the official firmware and the apps you pick). Pick <b>Dev</b> among its apps. A robot already set up: add Dev on its card on m.i41.eu (the robot gets the new app list at once over its connection to the manager).</li>
+    <li><b>At home:</b> run Dev yourself (<a href="https://github.com/i41-eu/q41eu-dev#run">the readme</a>: one Go binary or the container) and add it with your home manager, or over USB without one:<br>
+      <code>i41eu-usb provision -url ws://&lt;your computer&gt;:8785 -name Dev -token-file ~/.config/stackchan-server/robot-token</code></li>
+  </ul>
+  <p>On the robot: swipe up from the bottom edge, tap <b>QR</b>, then <b>Next</b> until it shows Dev, and <b>Connect</b>. The robot shows Dev's QR code.</p>
+</section>
+
+<section class="card">
+  <h2 id="browser">2. Your browser gets the robot</h2>
+  <ul class="links">
+    <li><b>Signed in at the manager</b> (m.i41.eu): open <a href="/robots">Your robots</a> in the same browser. It signs you in through the manager and shows every robot you set up with Dev, without a QR code. (<b>Sign in</b> at the top if it does not.)</li>
+    <li><b>Or by the robot's QR code:</b> scan it with your phone, or open the link under it on your computer. <a href="/robots">Your robots</a> now shows your robot: <b>Try it</b> runs every action by hand, <b>Events</b> shows what people do at the robot.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2 id="key">3. A key for your program</h2>
+  <p>On <a href="/robots">Your robots</a>, <b>New key</b> (name it after where it will live: "laptop", "ci", "claude"). The key is shown once, with the three lines for your shell:</p>
+<pre><code>export SDEV_URL=https://dev.q41.eu            # where Dev runs
+export SDEV_ROBOT=stackchan-0a1b2c3d4e50      # your robot
+export SDEV_KEY=sdev_…                        # the key: keep it like a password</code></pre>
+  <p>Put them in your shell's profile, or in a file you <code>source</code> (never in a repository). The key works for this robot only. You see it, with when it was last used, on <a href="/robots">Your robots</a> and on the robot's card on m.i41.eu, and delete it in either place.</p>
+</section>
+
+<section class="card">
+  <h2 id="examples">4. Your first program</h2>
+  <p>In a clone of the repository (<code>git clone https://github.com/i41-eu/q41eu-dev &amp;&amp; cd q41eu-dev</code>), the hello example: a card, green LEDs, a nod, a chime.</p>
+  {{template "code" .Start}}
+  <p>Each example stands alone: copy one file, or run the Go ones without a clone (<code>go run github.com/i41-eu/q41eu-dev/examples/go/hello@latest</code>). Python needs only its standard library, JavaScript only Node 18 or newer.</p>
+  <ul class="links">
+    {{range .Examples}}<li><a href="/docs/examples#ex-{{.ID}}">{{.Title}}</a>: {{.What}}</li>
+    {{end}}</ul>
+  <p><a href="/docs/examples">Examples</a> has them all in every language, each with a <b>Run</b> button that does the same from the page.</p>
+</section>
+
+<section class="card">
+  <h2 id="agent">5. An AI agent</h2>
+  <p>The same actions are MCP tools (<code>robot_show</code>, <code>robot_ask</code>, <code>robot_events</code>, …) at <code>$SDEV_URL/mcp</code>. For Claude Code:</p>
+<pre><code>claude mcp add --transport http stackchan "$SDEV_URL/mcp" --header "Authorization: Bearer $SDEV_KEY"</code></pre>
+  <p>Then ask it, for example, "show on the robot what you are working on, and ask me there before you push". Any MCP client that speaks Streamable HTTP works the same way. Every action on <a href="/docs/api">the API page</a> has its MCP tool call next to the other languages.</p>
+</section>
+
+<section class="card">
+  <h2 id="program">6. Your own program</h2>
+  <ul class="links">
+    <li><b>The API:</b> every action is <code>POST $SDEV_URL/v1/robots/$SDEV_ROBOT/&lt;action&gt;</code> with a JSON object: <a href="/docs/api">the API by part</a> has every action, its arguments and a call in each language; <a href="/v1/openapi.json">/v1/openapi.json</a> is the same as an OpenAPI 3.1 document (load it into any OpenAPI tool, or a generator for your language).</li>
+    <li><b>Go:</b> <a href="https://github.com/i41-eu/q41eu-dev/blob/main/client/client.go">client</a> (<code>client.FromEnv()</code>, then <code>Show</code>, <code>Ask</code>, <code>Events</code>, …).</li>
+    <li><b>Limits:</b> 10 actions a second per key (bursts of 30). The robot shows one card at a time: a new one replaces the last. It blanks its screen after a minute without use; a card wakes it.</li>
+    <li><b>What a person did</b> comes as <a href="/docs/api#people">events</a> (<code>tap</code>, <code>pat</code>, <code>pet</code>, <code>stroke</code>, <code>shaken</code>, <code>picked_up</code>, <code>near</code>, <code>away</code>, <code>tag</code>, <code>remote</code>, <code>button</code>, …): ask for the ones after the last <code>seq</code> you saw, waiting up to a minute (<code>?after=&lt;seq&gt;&amp;seconds=30</code>).</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2 id="lower-level">Lower level</h2>
+  <p>Dev is the robot's higher-level API. Underneath, the robot speaks the device wire protocol (every sensor raw, every command, video and audio): the <a href="https://github.com/i41-eu/q41eu-raw">Raw data app</a> shows all of it, and an app of your own can speak it directly, with Dev's <a href="https://github.com/i41-eu/q41eu-dev#the-go-kit">Go kit</a> (<code>robothub</code> for the connection) or on its own.</p>
+</section>
+{{end}}

@@ -1,0 +1,37 @@
+{{define "main"}}
+<h1>Stackchan Dev</h1>
+<p class="sub">Your robot from your own programs and AI agents: show text, ask a question, light the LEDs, play a sound, hear what people do at it. One key per robot, made here; then a few lines of curl, Python, JavaScript or Go, or an AI agent over MCP.</p>
+
+<section class="card" id="brief" hidden aria-label="Your robots">
+  <div class="brief" id="briefList"></div>
+  <p class="muted"><a href="/robots">Your robots</a>: try every action by hand, make keys, see what people do at the robot.</p>
+</section>
+
+<section class="card">
+  <h2 id="start">Start here</h2>
+  <ol class="steps">
+    <li>Give your robot Dev as one of its apps (on <a href="https://m.i41.eu">m.i41.eu</a>, or your home manager). Signed in there, <a href="/robots">Your robots</a> shows it at once (<b>Sign in</b> at the top); or switch the robot to Dev (swipe up, <b>QR</b>, Next, Connect) and scan its QR code.</li>
+    <li><b>New key</b> on the robot's card in <a href="/robots">Your robots</a>: it shows the three variables for your shell, <code>SDEV_URL</code>, <code>SDEV_ROBOT</code>, <code>SDEV_KEY</code>.</li>
+    <li>Run your first program below: here with <b>Run</b>, then on your computer, in the language you like.</li>
+  </ol>
+  <p>The whole way, with the robot's setup over USB: <a href="/docs/start">Getting started</a>.</p>
+</section>
+
+<section class="card">
+  <h2 id="first-program">Your first program</h2>
+  {{with example "hello"}}<p>{{.What}}: the same in every language. In a clone of <a href="https://github.com/i41-eu/q41eu-dev">the repository</a>, with the three variables set:</p>
+  {{template "exbody" .}}{{end}}
+</section>
+
+<section class="card">
+  <h2 id="more">More</h2>
+  <ul class="links">
+    <li><a href="/docs/api">The API by part</a>: every action by the part of the robot it uses (screen, head, LEDs, speaker), its arguments, a call in each language; the events people make at the robot.</li>
+    <li><a href="/docs/examples">Examples</a>: whole programs (a question with buttons, a build status, what people do), each in every language.</li>
+    <li><a href="/docs/start">Getting started</a>: from a robot on your desk to your program driving it, about ten minutes.</li>
+    <li><a href="/v1/openapi.json">OpenAPI 3.1</a>: the whole API, for API tools and client generators.</li>
+    <li><a href="https://github.com/i41-eu/q41eu-dev#the-go-kit">The Go kit</a>: for apps the robot connects to itself, as Focus and Pet do.</li>
+    <li><a href="https://github.com/i41-eu/q41eu-raw">Lower level</a>: the robot's device protocol, every sensor raw (the Raw data app).</li>
+  </ul>
+</section>
+{{end}}

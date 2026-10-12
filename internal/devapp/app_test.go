@@ -123,7 +123,7 @@ func TestDevApp(t *testing.T) {
 	jar, _ := cookiejar.New(nil)
 	browser := &http.Client{Jar: jar}
 	res, err := browser.Get(ts.URL + "/pair?code=" + robot.code)
-	if err != nil || res.StatusCode != http.StatusOK {
+	if err != nil || res.StatusCode != http.StatusOK || res.Request.URL.Path != "/robots" {
 		t.Fatalf("pair: %v %v", err, res.Status)
 	}
 	dev := map[string]string{"X-Requested-With": "dev"}

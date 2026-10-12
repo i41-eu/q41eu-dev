@@ -2,7 +2,8 @@
 
 From a Stackchan robot on your desk to your own program (or AI agent) driving it: about ten
 minutes. You need the robot, a computer with Chrome (for the USB setup), and a phone or the same
-computer for Dev's page.
+computer for Dev's site. The site has this guide too (**Getting started**), with every command in
+the languages you pick.
 
 ## 1. The robot gets Dev as one of its apps
 
@@ -21,16 +22,16 @@ On the robot: swipe up from the bottom edge, tap **QR**, then **Next** until it 
 
 ## 2. Your browser gets the robot
 
-- **Signed in at the manager** (m.i41.eu): open Dev's page in the same browser. It signs you in
-  through the manager and shows every robot you set up with Dev, without a QR code. (**Sign in**
-  at the top if it does not.)
+- **Signed in at the manager** (m.i41.eu): open Dev's site in the same browser. It signs you in
+  through the manager, and **Your robots** shows every robot you set up with Dev, without a QR
+  code. (**Sign in** at the top if it does not.)
 - **Or by the robot's QR code:** scan it with your phone, or open the link under it on your
-  computer. Dev's page now shows your robot: **Try it** runs every
-action by hand, **Events** shows what people do at the robot.
+  computer. **Your robots** on Dev's site now shows your robot: **Try it** runs every action by
+  hand, **Events** shows what people do at the robot.
 
 ## 3. A key for your program
 
-On Dev's page, **New key** (name it after where it will live: "laptop", "ci", "claude"). The key
+On **Your robots**, **New key** (name it after where it will live: "laptop", "ci", "claude"). The key
 is shown once, with the three lines for your shell:
 
 ```bash
@@ -40,7 +41,7 @@ export SDEV_KEY=sdev_…                        # the key: keep it like a passwo
 ```
 
 Put them in your shell's profile, or in a file you `source` (never in a repository). The key
-works for this robot only. You see it, with when it was last used, on Dev's page and on the
+works for this robot only. You see it, with when it was last used, on Dev's site and on the
 robot's card on m.i41.eu, and delete it in either place.
 
 ## 4. Run the examples
@@ -61,7 +62,8 @@ go run ./examples/go/hello                        # Go, with the client package
 | events | prints what people do at the robot; a pat makes it chirp and smile, a tag shows its text | [events.sh](../examples/curl/events.sh) | [events.py](../examples/python/events.py) | [events.mjs](../examples/js/events.mjs) | [events](../examples/go/events/main.go) | [events](../examples/mcp/events.txt) |
 
 The MCP column is for an AI agent (section 5): what to ask it, and the tool calls it makes. Dev's
-page has the same examples with a **Run** button each, which does the same from the page.
+site (**Examples**) has the same examples in every language, each with a **Run** button, which
+does the same from the page.
 
 Without a clone: `go run github.com/i41-eu/q41eu-dev/examples/go/hello@latest`, or copy a Python
 or JavaScript file: each one stands alone.
@@ -82,7 +84,7 @@ you push". Any MCP client that speaks Streamable HTTP works the same way.
 
 - **The API:** every action is `POST $SDEV_URL/v1/robots/$SDEV_ROBOT/<action>` with a JSON
   object; the actions and their arguments are in the [readme](../readme.md#the-api), on Dev's
-  page, and as an OpenAPI 3.1 document at `$SDEV_URL/v1/openapi.json` (load it into any OpenAPI
+  site (**API**, with a call of each in every language), and as an OpenAPI 3.1 document at `$SDEV_URL/v1/openapi.json` (load it into any OpenAPI
   tool, or a generator for your language).
 - **Go:** [`client`](../client/client.go) (`client.FromEnv()`, then `Show`, `Ask`, `Events`, …).
 - **Limits:** 10 actions a second per key (bursts of 30). The robot shows one card at a time:

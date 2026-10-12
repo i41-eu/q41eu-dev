@@ -38,11 +38,11 @@ and for an AI agent (MCP).
 
 1. Run Dev (below) and give the robot Dev as one of its apps (its manager, or over USB:
    `i41eu-usb provision -url ws://<this computer>:8785 -name Dev -token-file <the token>`).
-2. Open Dev's page signed in at the robot's manager (with `-manager-sign-in`: your robots show
+2. Open Dev's site signed in at the robot's manager (with `-manager-sign-in`: your robots show
    at once), or switch the robot to Dev (QR screen: Next, Connect) and scan its QR code with
-   your phone or computer. Dev's page shows the robot.
-3. **New key** on the page. It is shown once, with a `curl` line to try and the line that gives it
-   to Claude Code:
+   your phone or computer. **Your robots** on the site shows the robot.
+3. **New key** there. It is shown once, with the variables for the examples and the line that
+   gives it to Claude Code:
 
    ```bash
    curl -s -X POST http://dev.local:8785/v1/robots/stackchan-0a1b2c3d4e50/show \
@@ -51,15 +51,29 @@ and for an AI agent (MCP).
    claude mcp add --transport http stackchan http://dev.local:8785/mcp --header "Authorization: Bearer sdev_…"
    ```
 
-When it connects, the robot shows Dev's own card ("Dev · Ready"); then your programs' cards. The page's **Try it** runs every action by hand, and **Events** shows what people
-do at the robot and what programs asked of it, as it happens.
+When it connects, the robot shows Dev's own card ("Dev · Ready"); then your programs' cards. On
+**Your robots**, **Try it** runs every action by hand, and **Events** shows what people do at the
+robot and what programs asked of it, as it happens.
+
+## The site
+
+Dev serves its own docs, built into the binary (a Dev at home has them offline):
+[docs/site.md](docs/site.md).
+
+- **Pages:** Home, Your robots, Getting started, the API by part (every action with a call in
+  each language, the events by sensor), Examples (every example in every language, with Run).
+- **Languages:** chips at the top for curl, Python, JavaScript, Go and MCP (what to ask an AI
+  agent): all on by default, several at once, remembered in the browser; every code block is
+  shown in each language picked, side by side or in tabs. `?lang=python` in a link picks for one
+  page.
 
 ## The API
 
 Every action is `POST /v1/robots/<robot>/<action>` with a JSON object (all arguments optional
 unless marked), answered `{"ok": true, …}` or `{"ok": false, "error"}` (400 a wrong argument, 404
 not your robot, 501 the robot does not offer it, 503 the robot is offline). The same action is the
-MCP tool `robot_<action>`. `GET /v1/actions` lists them with their arguments as JSON.
+MCP tool `robot_<action>`. `GET /v1/actions` lists them with their arguments as JSON; the site's
+API page has a call of each in every language.
 
 | Action | Arguments | What it does |
 |---|---|---|
@@ -139,7 +153,8 @@ go run ./cmd/q41eu-dev                  # listens on :8785
 - `-public-url` is the base URL in QR codes and the key's examples (default `http://<LAN IP>:8785`).
 - `-state-file` (default `~/.local/state/q41eu-dev/state.json`) or `-state-database`
   (Postgres, q41eu-raw's `statestore`) keeps pairings and keys.
-- `-ui-dir internal/devapp/ui` serves the page from disk (edits need only a reload).
+- `-ui-dir internal/devapp/site` renders the site from disk on every request (edits need only a
+  reload).
 - `-manager-sign-in` (with `-manager-url`): one sign-in for all the manager's apps; the owner's
   signed-in browsers get the robots they set up with Dev, without the QR code.
 - `-trusted-proxies 1` behind one reverse proxy that appends the client address to
@@ -151,7 +166,9 @@ go run ./cmd/q41eu-dev                  # listens on :8785
   question's buttons, a picture), answers a question with a USB tap, and writes `report/index.html`
   with every screenshot.
 - `go test -race ./...` runs the tests: the hub against a fake robot, the app end to end (pairing,
-  keys, actions, a question answered by a tap, events, MCP).
+  keys, actions, a question answered by a tap, events, MCP), the site (every page, every example
+  in every language, the links), and, with Chrome or Chromium installed, the site in a headless
+  browser (the language selector, the robot's card, a phone's width; `-short` skips it).
 
 ## License
 

@@ -36,6 +36,8 @@ type Action struct {
 	Name    string  `json:"name"`
 	Help    string  `json:"help"`
 	Params  []Param `json:"params"`
+	Example string  `json:"-"` // a typical call's arguments, as JSON: the docs' snippets in every language
+	Prompt  string  `json:"-"` // that call as a sentence to an AI agent (the docs' MCP snippet)
 	Offline bool    `json:"-"` // works while the robot is offline (it answers so)
 	run     func(ctx context.Context, a *App, id string, r *robothub.Robot, in args) (any, error)
 }
@@ -45,16 +47,18 @@ var Actions []Action
 
 func init() {
 	Actions = []Action{
-		{Name: "state", Offline: true,
-			Help: "Read the robot's state: online or not, model, firmware, its commands, its latest readings (units in their names: battery_pct, light_lux, head_yaw_deg, …) and its last events.",
+		{Name: "state", Offline: true, Example: `{}`,
+			Prompt: "How is the robot: is it online, and how full is its battery?",
+			Help:   "Read the robot's state: online or not, model, firmware, its commands, its latest readings (units in their names: battery_pct, light_lux, head_yaw_deg, …) and its last events.",
 			run: func(ctx context.Context, a *App, id string, r *robothub.Robot, in args) (any, error) {
 				info := a.robotInfo(id)
 				ev, _, _ := a.eventsAfter(id, 0, nil)
 				info["last_events"] = ev[max(0, len(ev)-10):]
 				return info, nil
 			}},
-		{Name: "show",
-			Help: "Show a card on the robot's screen (a title, big text that sizes itself, a note, a progress bar), or a picture; clear takes it away.",
+		{Name: "show", Example: `{"title": "Build", "text": "All tests pass", "color": "green", "progress": 1}`,
+			Prompt: "Show \"All tests pass\" on the robot, in green.",
+			Help:   "Show a card on the robot's screen (a title, big text that sizes itself, a note, a progress bar), or a picture; clear takes it away.",
 			Params: []Param{{Name: "text", Type: "string", Help: "big text in the middle"},
 				{Name: "title", Type: "string", Help: "small text at the top, in the colour"},
 				{Name: "note", Type: "string", Help: "small text at the bottom"},
@@ -102,15 +106,17 @@ func init() {
 				}
 				return nil, robot.ShowCard(r, card)
 			}},
-		{Name: "say",
+		{Name: "say", Example: `{"text": "Hi!"}`,
+			Prompt: "Say hi on the robot.",
 			Help:   "A speech bubble over the robot's face (needs the face: show clear first if a card is up).",
 			Params: []Param{{Name: "text", Type: "string", Required: true, Help: "at most 80 characters"}, {Name: "seconds", Type: "number", Help: "how long (default 6, at most 30)"}},
 			run: func(ctx context.Context, a *App, id string, r *robothub.Robot, in args) (any, error) {
 				s, _ := in.num("seconds")
 				return nil, robot.Say(r, in.str("text"), s)
 			}},
-		{Name: "face",
-			Help: "The robot's face: an emotion; or its own screen under cards: the face or its readings (its sensors live).",
+		{Name: "face", Example: `{"emotion": "happy"}`,
+			Prompt: "Make the robot smile.",
+			Help:   "The robot's face: an emotion; or its own screen under cards: the face or its readings (its sensors live).",
 			Params: []Param{{Name: "emotion", Type: "string", Enum: robot.Emotions, Help: "the face's emotion"},
 				{Name: "view", Type: "string", Enum: []string{"face", "readings"}, Help: "the robot's own screen"}},
 			run: func(ctx context.Context, a *App, id string, r *robothub.Robot, in args) (any, error) {
@@ -124,8 +130,9 @@ func init() {
 				}
 				return nil, nil
 			}},
-		{Name: "move",
-			Help: "Move the head: a gesture (nod, shake, home = face forward), or look at an angle.",
+		{Name: "move", Example: `{"gesture": "nod"}`,
+			Prompt: "Make the robot nod.",
+			Help:   "Move the head: a gesture (nod, shake, home = face forward), or look at an angle.",
 			Params: []Param{{Name: "gesture", Type: "string", Enum: []string{"nod", "shake", "home"}, Help: "a gesture"},
 				{Name: "yaw", Type: "number", Help: "degrees, -128..128, + to the robot's left"},
 				{Name: "pitch", Type: "number", Help: "degrees, 5..85, up"}},
@@ -146,8 +153,9 @@ func init() {
 				}
 				return nil, robot.Look(r, yaw, pitch)
 			}},
-		{Name: "leds",
-			Help: "The 12 LEDs on the head (two strips of 6): one colour, a bar from the screen end back (a level), single LEDs, an effect the robot animates, or off. Colours are corrected to look on the LEDs as on a screen.",
+		{Name: "leds", Example: `{"bar": 0.5, "color": "green"}`,
+			Prompt: "Light half of the robot's LEDs in green.",
+			Help:   "The 12 LEDs on the head (two strips of 6): one colour, a bar from the screen end back (a level), single LEDs, an effect the robot animates, or off. Colours are corrected to look on the LEDs as on a screen.",
 			Params: []Param{{Name: "color", Type: "string", Help: "#rrggbb or a name; all LEDs, or the bar's / effect's colour"},
 				{Name: "bar", Type: "number", Help: "0..1: light both strips from the screen end, this far"},
 				{Name: "pixels", Type: "array", Help: "12 colours: left strip 0-5 from the screen end back, right strip 6-11 from the back to the screen end"},
@@ -156,8 +164,9 @@ func init() {
 				{Name: "seconds", Type: "number", Help: "the effect's length (0 = until the next leds)"},
 				{Name: "off", Type: "boolean", Help: "all off"}},
 			run: runLEDs},
-		{Name: "sound",
-			Help: "A sound from the speaker: a named chime, or notes like \"C5:120 E5:120 G5:300\" (note:ms, - is a rest).",
+		{Name: "sound", Example: `{"chime": "tada"}`,
+			Prompt: "Play the tada chime on the robot.",
+			Help:   "A sound from the speaker: a named chime, or notes like \"C5:120 E5:120 G5:300\" (note:ms, - is a rest).",
 			Params: []Param{{Name: "chime", Type: "string", Enum: chimeNames(), Help: "a ready-made sound"},
 				{Name: "notes", Type: "string", Help: "a melody: note:ms ..., up to 30 s"},
 				{Name: "bell", Type: "boolean", Help: "the notes struck like a bell"},
@@ -184,14 +193,16 @@ func init() {
 				}
 				return map[string]any{"ms": sound.Ms(pcm)}, robot.Play(ctx, r, pcm)
 			}},
-		{Name: "ask",
-			Help: "Ask the person at the robot: the question and 2-4 answers as buttons on its screen; returns the answer they tap, or timed_out.",
+		{Name: "ask", Example: `{"question": "Deploy now?", "answers": ["Yes", "Not yet"]}`,
+			Prompt: "Ask me on the robot whether to deploy now.",
+			Help:   "Ask the person at the robot: the question and 2-4 answers as buttons on its screen; returns the answer they tap, or timed_out.",
 			Params: []Param{{Name: "question", Type: "string", Required: true, Help: "short: it is shown big"},
 				{Name: "answers", Type: "array", Required: true, Help: "2-4 short answers"},
 				{Name: "timeout_s", Type: "number", Help: "how long to wait (default 30, at most 120)"}},
 			run: runAsk},
-		{Name: "events", Offline: true,
-			Help: "What people did at the robot (tap, long_press, pat, pet, stroke, shaken, picked_up, near, away, tag, tag_removed, remote, button, plugged, unplugged), after a sequence number; waits up to seconds for the next one.",
+		{Name: "events", Offline: true, Example: `{"after": 0, "seconds": 30}`,
+			Prompt: "Wait up to 30 s for someone to touch the robot, and tell me what they did.",
+			Help:   "What people did at the robot (tap, long_press, pat, pet, stroke, shaken, picked_up, near, away, tag, tag_removed, remote, button, plugged, unplugged), after a sequence number; waits up to seconds for the next one.",
 			Params: []Param{{Name: "after", Type: "number", Help: "only events after this seq (0: the last ones kept)"},
 				{Name: "names", Type: "array", Help: "only these events"},
 				{Name: "seconds", Type: "number", Help: "wait this long for one (default 0, at most 60)"}},
@@ -214,8 +225,9 @@ func init() {
 					}
 				}
 			}},
-		{Name: "command",
-			Help: "Any of the robot's own commands, as the Raw data app sends them (the q41eu-raw readme lists them), for what the other actions do not cover. Its apps and its manager's settings are not reachable here.",
+		{Name: "command", Example: `{"command": "sticker", "args": {"name": "heart", "seconds": 5}}`,
+			Prompt: "Put a heart sticker on the robot's face for five seconds.",
+			Help:   "Any of the robot's own commands, as the Raw data app sends them (the q41eu-raw readme lists them), for what the other actions do not cover. Its apps and its manager's settings are not reachable here.",
 			Params: []Param{{Name: "command", Type: "string", Required: true, Help: "e.g. sticker, brightness, ir_send"},
 				{Name: "args", Type: "object", Help: "the command's arguments"}},
 			run: func(ctx context.Context, a *App, id string, r *robothub.Robot, in args) (any, error) {

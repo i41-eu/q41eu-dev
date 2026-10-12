@@ -1,0 +1,65 @@
+{{define "main"}}
+<h1>The API by part</h1>
+<p class="sub">Every action Dev offers, by the part of the robot it uses: what it does, its arguments, and one call in each language. Then what the robot senses: the events people make at it, and its readings.</p>
+<nav class="toc" aria-label="On this page"><a href="#calling">Calling an action</a>{{range .Parts}}<a href="#{{.ID}}">{{.Name}}</a>{{end}}</nav>
+
+<section class="card">
+  <h2 id="calling">Calling an action</h2>
+  <p>Every action is <code>POST $SDEV_URL/v1/robots/$SDEV_ROBOT/&lt;action&gt;</code> with its arguments as a JSON object (all optional unless marked required) and your key in <code>Authorization: Bearer sdev_…</code> (a new key on <a href="/robots">Your robots</a>). The same action is the MCP tool <code>robot_&lt;action&gt;</code> at <code>$SDEV_URL/mcp</code>, for AI agents. The calls below use these helpers:</p>
+  {{template "code" .Calling}}
+  <p>The answer is <code>{"ok": true, …}</code>, or <code>{"ok": false, "error": "…"}</code> with the status 400 (a wrong argument), 401 (no key, or not a valid one), 404 (not this key's robot), 429 (too many: 10 actions a second per key, bursts of 30), 501 (the robot does not offer it) or 503 (the robot is offline).</p>
+  <p>Also: <code>GET /v1/robots</code> (the key's robot), <code>GET /v1/robots/&lt;robot&gt;</code> (its state, as <a href="#state">state</a>), <code>GET /v1/robots/&lt;robot&gt;/events?after=&amp;names=&amp;seconds=</code> (as <a href="#events">events</a>), <code>GET /v1/actions</code> (the actions and their arguments as JSON), and <a href="/v1/openapi.json">/v1/openapi.json</a>: the whole API as OpenAPI 3.1, for API tools and client generators.</p>
+</section>
+
+{{with part "screen"}}<section class="card part">
+  <h2 id="{{.ID}}">{{.Name}}</h2>
+  <p>The 320×240 touch screen, with the robot's face. A program puts a card over the face (a title, big text that sizes itself, a note, a progress bar) or a picture; or a speech bubble or an emotion on the face itself. One card at a time: a new one replaces the last, and <code>show</code> with <code>clear</code> brings the face back. Taps on the screen come as <a href="#touch">events</a>.</p>
+  {{range .Actions}}{{template "action" .}}{{end}}
+</section>{{end}}
+
+{{with part "head"}}<section class="card part">
+  <h2 id="{{.ID}}">{{.Name}}</h2>
+  <p>Two servos turn the head: yaw, left and right, and pitch, up and down (5 to 85 degrees; the robot clamps it). A program nods, shakes it or looks at an angle. Touches on the head come as <a href="#head-touch">events</a>.</p>
+  {{range .Actions}}{{template "action" .}}{{end}}
+</section>{{end}}
+
+{{with part "lights"}}<section class="card part">
+  <h2 id="{{.ID}}">{{.Name}}</h2>
+  <p>Twelve LEDs, a strip of six on each side of the head. One colour, a bar (a level, from the screen end back), single LEDs, or an effect the robot animates by itself. Colours are corrected, so <code>#7d8cff</code> looks on the LEDs as it does on a screen.</p>
+  {{range .Actions}}{{template "action" .}}{{end}}
+</section>{{end}}
+
+{{with part "speaker"}}<section class="card part">
+  <h2 id="{{.ID}}">{{.Name}}</h2>
+  <p>A small speaker. Dev makes the sound (a ready-made chime, or a melody from notes) and sends it in parts the robot can buffer; the answer says how long it plays.</p>
+  {{range .Actions}}{{template "action" .}}{{end}}
+</section>{{end}}
+
+{{with part "asking"}}<section class="card part">
+  <h2 id="{{.ID}}">{{.Name}}</h2>
+  <p>Dev's own: a question and two to four answers as buttons on the screen, with a chime. The call waits for the tap on an answer and returns it, so a script or an agent can ask the person at the robot before it acts.</p>
+  {{range .Actions}}{{template "action" .}}{{end}}
+</section>{{end}}
+
+{{with part "people"}}<section class="card part">
+  <h2 id="{{.ID}}">{{.Name}}</h2>
+  <p>The robot reports only raw input (presses, releases with their length, swipes, tags); Dev turns it into what a person did, the same for every program. Each event has a <code>seq</code>: ask for the ones after the last you saw, waiting up to a minute for the next one.</p>
+  {{range .Actions}}{{template "action" .}}{{end}}
+  <h3 id="event-list">The events</h3>
+  {{range $.Events}}<h4 id="{{.ID}}">{{.Name}}</h4>
+  <dl class="evs">{{range .Events}}<dt id="ev-{{.Name}}"><code>{{.Name}}</code></dt><dd>{{.Means}}</dd>{{end}}</dl>
+  {{end}}<p>Plus <code>connected</code>: the robot connected to Dev (also after a restart).</p>
+</section>{{end}}
+
+{{with part "readings"}}<section class="card part">
+  <h2 id="{{.ID}}">{{.Name}}</h2>
+  <p>The robot reports its sensors every two seconds: the battery and charging, the room light and proximity, the head's angles and its servos' load and temperature, motion and the compass, the clock, Wi-Fi and memory. <code>state</code> returns the latest value of each, the units in their names (<code>battery_pct</code>, <code>light_lux</code>, <code>head_yaw_deg</code>, …), with whether the robot is online, its model, firmware, its own commands and its last events. The robot shows them on its own readings screen too (<a href="#face">face</a> with <code>view</code> <code>readings</code>).</p>
+  {{range .Actions}}{{template "action" .}}{{end}}
+</section>{{end}}
+
+{{with part "raw"}}<section class="card part">
+  <h2 id="{{.ID}}">{{.Name}}</h2>
+  <p>For what the actions above do not cover yet: any of the robot's own commands, as the Raw data app sends them (the <a href="https://github.com/i41-eu/q41eu-raw#commands">q41eu-raw readme</a> lists them: stickers, brightness, the screen off, infrared, the red power LED, …). Not those that switch the robot's apps, restart it or turn its streams on; their answers and events are not passed on.</p>
+  {{range .Actions}}{{template "action" .}}{{end}}
+</section>{{end}}
+{{end}}

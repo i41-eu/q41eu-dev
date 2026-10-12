@@ -1,7 +1,9 @@
 # Dev's site and the dev package: design
 
-**Status:** design, 2026-10-12. Nothing in it is built yet (docs describe only what exists;
-this is a plan, so it lives in `wip/`). Names of new actions, events and files are proposals.
+**Status:** design, 2026-10-12. Step 1 of the plan (section 10: the pages and the language
+selector) is built and described in [docs/site.md](../docs/site.md); its sections here keep only
+what is still to come. The rest is a plan (docs describe only what exists, so it lives in
+`wip/`). Names of new actions, events and files are proposals.
 
 **The request** (the project's owner, 2026-10-12): a much better web site for dev.q41.eu.
 Languages to pick at the top (several at once, all of them by default); every feature,
@@ -52,6 +54,11 @@ Its other assets: `/examples/<lang>/<file>` (the example files as text), `/v1/ac
 What it lacks: a language choice across the page, search, an API reference by robot part,
 the robot's readings, anything beyond the ten actions, advanced apps, and a JavaScript
 client usable outside this page.
+
+Since then, in the repository (not released yet): step 1, five pages with the language selector
+([docs/site.md](../docs/site.md)), and the four examples in every language: JavaScript files for
+Node in `examples/js` (each with its own `act`, as the Python ones; the library of section 3.2
+is still to come), build status in curl, and each example for an agent in `examples/mcp`.
 
 ### 1.2 The API and the Go kit
 
@@ -272,23 +279,17 @@ build an app (the kit, the case studies).
 `/pair` keeps redirecting to `/robots?paired=…`. The header on every page: Dev, the page
 links, the search box, the language chips, the account.
 
+Built (step 1, [docs/site.md](../docs/site.md)): `/`, `/robots`, `/docs/start`, `/docs/api`
+(the parts of today's actions, the events by sensor), `/docs/examples`, the header (without the
+search box). The other pages come with the steps that make them true.
+
 ### 5.3 The language selector
 
-- **Chips in the header:** `curl`, `Python`, `JavaScript`, `Go`, `MCP`. Several can be on;
-  **all are on by default**; at least one stays on (turning off the last turns all on).
-- **Remembered per browser** in `localStorage` (`dev.langs`, a list), wrapped in try/catch: a
-  browser without storage gets all languages every time. `?lang=python,go` in the address wins
-  for that page, so a link can show one language; the chips then offer "keep this".
-- **Applied before the first paint:** a small script in `<head>` sets classes on `<html>`
-  (`lang-python lang-go`); CSS hides the code of the others. No flash, no layout jump.
-- **Side by side or tabs:** a switch next to the chips, remembered too. Side by side: the
-  picked languages in a grid (`repeat(auto-fit, minmax(320px, 1fr))`): two or three
-  across on a laptop, one under the other on a phone. Tabs: one at a time per example, the
-  tab picked follows across the page.
-- **Every code block:** the language's name, Copy, Download (where it is a whole file), and
-  Run for examples (it runs the JavaScript version on your robot, whichever language is
-  shown). A language an example does not have yet says so ("not in Go yet") with a link to
-  the coverage page, instead of hiding it.
+Built in step 1 as designed here (chips for curl, Python, JavaScript, Go and MCP, all on by
+default, remembered per browser, `?lang=`, applied before the first paint, side by side or
+tabs, Copy, Download, Run): [docs/site.md](../docs/site.md#languages). Still to come: a language
+an example does not have yet links to the coverage page (step 5); today every example has every
+language.
 
 ### 5.4 Code blocks and Run
 
@@ -330,7 +331,7 @@ Each part's section, made from the catalog and the action table:
 
 Each example: a title, what it shows in one sentence, its tags (the parts and helpers it
 uses), the code in every language it exists in, Run, and what to expect on the robot. The
-gallery filters by tag. Today's four stay; each new feature brings one (section 10). A
+gallery filters by tag (still to come; the rest is built in step 1). Today's four stay; each new feature brings one (section 10). A
 manifest (`examples/examples.json`) lists them; the tests read it (section 6.4).
 
 ### 5.8 Advanced apps
@@ -354,9 +355,9 @@ Sbot (a cockpit and the TPBot car), with what each one shows a developer.
 
 ### 5.9 Building the pages
 
-`internal/devapp/site/`: one template per page, HTML fragments for prose, the shared header
-and CSS; rendered once at start (and from disk with `-ui-dir`). The readme keeps its short
-API table, checked by a test against the action table (today it is kept by hand).
+Built in step 1: `internal/devapp/site/`, one template per page, rendered once at start and
+from disk with `-ui-dir`; the readme's API table is checked by a test against the action table
+([docs/site.md](../docs/site.md#how-it-is-made)).
 
 ## 6. API coverage
 
@@ -733,7 +734,7 @@ Each step is a release that is useful on its own, in this order. Tests: `gofmt`,
 
 | # | Step | Repo | What changes | Tested by |
 |---|---|---|---|---|
-| 1 | **Pages and the language selector** | q41eu-dev | the page split into Home, Your robots, Start, API, Examples; the header with the chips (curl, Python, Go, MCP), side by side or tabs, remembered; the four examples in all their languages; `/pair` to `/robots` | a test renders every page: every example in each of its languages, every internal link answers 200; the readme's table equals the action table; a look at phone width |
+| 1 | **Pages and the language selector** (built: [docs/site.md](../docs/site.md)) | q41eu-dev | the page split into Home, Your robots, Start, API, Examples; the header with the chips (curl, Python, JavaScript, Go, MCP), side by side or tabs, remembered; the four examples in all their languages; `/pair` to `/robots` | a test renders every page: every example in each of its languages, every internal link answers 200; the readme's table equals the action table; a look at phone width |
 | 2 | **Search** | q41eu-dev | `/docs/search.json` (actions, arguments, events, examples, pages, synonyms), the box in the header | a test: the index has every action, argument, event, example and page heading |
 | 3 | **Case studies, first version** | q41eu-dev | Focus and Pet as they are today: what `robothub` and `sound` do for them, mapped to their code; each later step adds its piece when it lands | links checked; reviewed against the apps' code |
 | 4 | **The protocol catalog** | i41eu-arch (one line in the spec), q41eu-raw | `wire/catalog.go`; `fake-robot` from it; `screen_snapshot` and `speaker_flush` documented; the readme's Commands table checked | q41eu-raw tests: readme ↔ catalog, fake-robot ↔ catalog |
@@ -760,12 +761,12 @@ the apps move onto it (12–13); media last (14), behind the most rules.
 
 ## 11. Decisions for the owner
 
-1. **Languages:** curl, Python, JavaScript, Go, and MCP as a column. Recommended. Blocks
-   (Blockly) for kids later, on the JavaScript library: yes or no?
+1. **Languages:** curl, Python, JavaScript, Go, and MCP as a column. Recommended (step 1 is
+   built with them). Blocks (Blockly) for kids later, on the JavaScript library: yes or no?
 2. **Where the libraries come from:** served by Dev and kept in the repo (recommended), or
    also published to npm and PyPI (a public release each time).
-3. **Docs prose:** HTML fragments with Go templates (recommended, no new dependency), or a
-   Markdown library (goldmark), or a small Markdown subset of our own.
+3. **Docs prose:** HTML fragments with Go templates (recommended, no new dependency; step 1 is
+   built so), or a Markdown library (goldmark), or a small Markdown subset of our own.
 4. **The catalog's home:** `wire` in q41eu-raw (recommended; the spec in i41eu-arch names
    it), or a JSON file in i41eu-arch that every repo copies.
 5. **`command` behind a `raw` scope,** which breaks keys that use `command` today
@@ -788,7 +789,7 @@ the apps move onto it (12–13); media last (14), behind the most rules.
     (recommended, as Raw data), or anyone with the robot's QR code, as today.
 13. **Keys in web pages:** CORS for bearer requests now (recommended), and a "connect your
     robot" flow for shared pages later: yes or no?
-14. **The site's language:** English only for now; Czech later?
+14. **The site's language:** English only for now (as step 1 is); Czech later?
 15. **Runners in CI:** `node` and `python3` for the example tests (recommended; GitHub's
     runners have both), or only Go in CI and the other languages checked by hand.
 

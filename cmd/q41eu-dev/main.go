@@ -39,7 +39,7 @@ func main() {
 		tokenFile    = flag.String("token-file", defaultConfigFile("stackchan-server", "robot-token"), "file with the robot bearer token; generated if missing")
 		stateFile    = flag.String("state-file", defaultStateFile(), "JSON file with pairings and keys (\"\" keeps them in memory only)")
 		stateDB      = flag.String("state-database", os.Getenv("STATE_DATABASE_URL"), "keep the state in Postgres instead (postgres://user@host/db; the password from PGPASSWORD)")
-		uiDir        = flag.String("ui-dir", "", "development: serve the page from this directory (internal/devapp/ui)")
+		uiDir        = flag.String("ui-dir", "", "development: render the site from this directory on every request (internal/devapp/site)")
 		debug        = flag.Bool("debug", false, "debug logging")
 		mgrURL       = flag.String("manager-url", "", "the Stackchan manager that set robots up with tokens for this app (\"\" = none)")
 		mgrSecret    = flag.String("manager-secret-file", "", "file with this app's secret at the manager")

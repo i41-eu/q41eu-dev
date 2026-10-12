@@ -1,0 +1,13 @@
+{{define "main"}}
+<h1>Your robots</h1>
+<p class="sub">The robots paired with this browser. <b>Try it</b> runs every action by hand, <b>Keys</b> are for your programs and AI agents, <b>Events</b> shows what people do at the robot and what programs asked of it, as it happens.</p>
+<noscript><p class="card">This page needs JavaScript: it talks to your robots live.</p></noscript>
+<div id="robots"></div>
+<div class="card" id="empty" hidden>
+  <p>No robot is paired with this browser yet.</p>
+  <p id="signinHint" hidden><a href="/auth/login?next=/robots">Sign in</a> with your account at the robots' manager: the robots you set up there with Dev show here at once, no QR code.</p>
+  <p>Or on the robot, switch to <b>Dev</b> (swipe up, <b>QR</b>, Next, Connect) and scan its QR code with this device.</p>
+  <p id="mgrHint" hidden>A new robot, or Dev not among its apps? Add it on <a id="mgrLink2" target="_blank" rel="noopener">its manager</a> (over USB for a new robot).</p>
+  <p>The whole way: <a href="/docs/start">Getting started</a>.</p>
+</div>
+{{end}}

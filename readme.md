@@ -28,7 +28,7 @@ three variables in your shell, and the [examples](examples/) in curl, Python and
 
 | Piece | What it is | Needed? |
 |---|---|---|
-| **Robot** | a Stackchan with the [Embody Mode firmware](https://github.com/i41-eu/i41eu-embody/tree/main/firmware/main/apps/app_embody_mode). On its screen the **app switcher** (the QR screen: Next, Connect) lists its apps and switches between them. | yes |
+| **Robot** | a Stackchan with the [Embody Mode firmware](https://github.com/i41-eu/i41eu-StackChan/tree/embody/firmware/main/apps/app_embody_mode). On its screen the **app switcher** (the QR screen: Next, Connect) lists its apps and switches between them. | yes |
 | **Apps** | what the robot does, one at a time. Each app is a web service the robot connects to, with a web page. This repo is **Dev**: the robot connects to it, and your programs reach the robot through it. | Dev |
 | **Phone or browser** | opens Dev's page, pairs with the robot by scanning its QR code, and makes **keys** for your programs | once per key |
 | **Your programs, AI agents** | use the robot through Dev's API with a key: HTTP (`/v1`) or MCP (`/mcp`) | the point |

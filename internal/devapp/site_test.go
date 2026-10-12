@@ -260,3 +260,89 @@ func TestReadmeTable(t *testing.T) {
 		t.Fatalf("readme's API table: %v\nthe actions: %v", got, want)
 	}
 }
+
+// The search's index has every action, argument, event, example, page and section, each pointing
+// at its anchor; its synonyms lead only to words the site has.
+func TestSearchIndex(t *testing.T) {
+	a := New(Config{Log: slog.New(slog.NewTextHandler(io.Discard, nil)), PublicURL: "https://dev.example", Version: "test"})
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+	res, err := http.Get(ts.URL + "/docs/search.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK || res.Header.Get("Content-Type") != "application/json" || len(raw) > 96<<10 {
+		t.Fatalf("search.json: %d %s, %d bytes", res.StatusCode, res.Header.Get("Content-Type"), len(raw))
+	}
+	var idx struct {
+		Kinds    []string
+		Entries  []searchEntry
+		Synonyms map[string][]string
+	}
+	if err := json.Unmarshal(raw, &idx); err != nil {
+		t.Fatal(err)
+	}
+	pages := map[string]string{}
+	for _, p := range sitePages {
+		_, pages[p.Path] = get(t, ts.URL+p.Path)
+	}
+	byURL := map[string]searchEntry{}
+	words := map[string]bool{}
+	split := regexp.MustCompile(`[^a-z0-9_]+`)
+	for _, e := range idx.Entries {
+		if _, dup := byURL[e.URL]; dup {
+			t.Errorf("%s twice", e.URL)
+		}
+		byURL[e.URL] = e
+		if e.Name == "" || !slices.Contains(idx.Kinds, e.Kind) {
+			t.Errorf("%+v", e)
+		}
+		path, frag, _ := strings.Cut(e.URL, "#")
+		if pages[path] == "" || (frag != "" && !strings.Contains(pages[path], ` id="`+frag+`"`)) {
+			t.Errorf("%s (%s): no such page or anchor", e.URL, e.Name)
+		}
+		for _, w := range split.Split(strings.ToLower(strings.Join(append([]string{e.Name, e.Text, e.In}, e.Parts...), " ")), -1) {
+			words[w] = true
+		}
+	}
+	want := func(url, kind, name string) {
+		t.Helper()
+		if e, ok := byURL[url]; !ok || e.Kind != kind || e.Name != name {
+			t.Errorf("%s: %+v, want %s %s", url, e, kind, name)
+		}
+	}
+	for _, act := range Actions {
+		want("/docs/api#"+act.Name, "Actions", act.Name)
+		for _, p := range act.Params {
+			want("/docs/api#"+act.Name+"-"+p.Name, "Arguments", p.Name)
+		}
+	}
+	for _, e := range gesture.Names {
+		want("/docs/api#ev-"+e.Name, "Events", e.Name)
+	}
+	infos, _ := loadExamples()
+	for _, ex := range infos {
+		want("/docs/examples#ex-"+ex.ID, "Examples", ex.Title)
+	}
+	h2 := regexp.MustCompile(`<h2 id="([^"]+)">`)
+	for _, p := range sitePages {
+		want(p.Path, "Pages", p.Title)
+		for _, m := range h2.FindAllStringSubmatch(pages[p.Path], -1) {
+			if _, ok := byURL[p.Path+"#"+m[1]]; !ok {
+				t.Errorf("the section %s#%s is not in the index", p.Path, m[1])
+			}
+		}
+	}
+	if e := byURL["/docs/start#agent"]; e.Name != "5. An AI agent" || e.In != "Getting started" || !strings.Contains(e.Text, "MCP tools") {
+		t.Errorf("a section: %+v", e)
+	}
+	for w, syns := range idx.Synonyms {
+		for _, s := range syns {
+			if !words[s] {
+				t.Errorf("synonym %s -> %s: not a word of the site", w, s)
+			}
+		}
+	}
+}

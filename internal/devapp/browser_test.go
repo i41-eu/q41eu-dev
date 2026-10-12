@@ -473,6 +473,53 @@ func TestPagesInBrowser(t *testing.T) {
 	}
 	b.noErrors("the robot's card")
 
+	// The search: "/" goes to the box, results show as you type, Enter opens the first one.
+	firstResult := `(() => { const o = document.querySelector("#q-results [role=option]"); return o && !document.getElementById("q-results").hidden ? o.closest("[role=group]").firstChild.textContent + " " + o.querySelector("b").textContent : ""; })()`
+	result := func(want string) {
+		t.Helper()
+		b.waitFor("the result "+want, firstResult+` === `+fmt.Sprintf("%q", want))
+	}
+	b.open(ts.URL + "/docs/examples")
+	b.press("/")
+	if !b.is(`document.activeElement.id === "q"`) {
+		t.Fatal("/ does not go to the search box")
+	}
+	b.call("Input.insertText", map[string]any{"text": "leds"}, nil) // an action, by its name
+	result("Actions leds")
+	b.press("Enter")
+	b.waitFor("the leds action", `location.pathname === "/docs/api" && location.hash === "#leds" && document.readyState === "complete" && typeof Dev === "object"`)
+	b.press("/")
+	b.call("Input.insertText", map[string]any{"text": "red and a shake"}, nil) // an example, by what it does
+	result("Examples build status")
+	b.press("ArrowDown")
+	if !b.is(`document.getElementById("q").getAttribute("aria-activedescendant") === "q-o0" && document.getElementById("q-o0").getAttribute("aria-selected") === "true"`) {
+		t.Fatal("the arrow keys do not move through the results")
+	}
+	b.press("Escape")
+	if !b.is(`document.getElementById("q-results").hidden && document.getElementById("q").getAttribute("aria-expanded") === "false"`) {
+		t.Fatal("Escape does not close the results")
+	}
+	b.press("Escape")
+	if !b.is(`document.getElementById("q").value === ""`) {
+		t.Fatal("a second Escape does not clear the box")
+	}
+	b.call("Input.insertText", map[string]any{"text": "red and a shake"}, nil)
+	b.press("Escape")
+	b.press("ArrowDown")
+	result("Examples build status")
+	b.press("Enter")
+	b.waitFor("the build status example", `location.pathname === "/docs/examples" && location.hash === "#ex-build"`)
+	b.eval(`document.getElementById("q").focus()`, nil)
+	b.eval(`document.getElementById("q").select()`, nil)
+	b.call("Input.insertText", map[string]any{"text": "touch"}, nil) // a synonym: our word is tap, pat, …
+	b.waitFor("events for touch", firstResult+`.startsWith("Events ")`)
+	for _, nothing := range []string{"zzqx", "constructor"} { // not a word of the site; not a synonym either
+		b.eval(`document.getElementById("q").select()`, nil)
+		b.call("Input.insertText", map[string]any{"text": nothing}, nil)
+		b.waitFor("nothing found for "+nothing, `!!document.querySelector("#q-results .none") && document.getElementById("q-results").textContent.includes(`+fmt.Sprintf("%q", nothing)+`)`)
+	}
+	b.noErrors("the search")
+
 	// Phone width: no page scrolls sideways.
 	b.call("Emulation.setDeviceMetricsOverride", map[string]any{"width": 390, "height": 844, "deviceScaleFactor": 2, "mobile": true}, nil)
 	for _, p := range sitePages {
@@ -484,6 +531,12 @@ func TestPagesInBrowser(t *testing.T) {
 			b.eval(`[...document.querySelectorAll("body *")].filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1).slice(0, 5).map((e) => e.tagName + "." + e.className)`, &wide)
 			t.Errorf("%s at phone width: %d px wide in %d (%v)", p.Path, w[0], w[1], wide)
 		}
+	}
+	b.eval(`document.getElementById("q").focus()`, nil)
+	b.call("Input.insertText", map[string]any{"text": "sound"}, nil)
+	b.waitFor("results at phone width", `!document.getElementById("q-results").hidden`)
+	if !b.is(`(() => { const r = document.getElementById("q-results").getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; })()`) {
+		t.Error("the search's results do not fit a phone")
 	}
 	b.noErrors("phone width")
 }

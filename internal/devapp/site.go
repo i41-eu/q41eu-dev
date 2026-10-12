@@ -10,6 +10,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"html"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -136,8 +137,9 @@ type siteData struct {
 
 // site is the rendered site.
 type site struct {
-	pages map[string][]byte // path -> the page
-	files fs.FS             // its scripts
+	pages  map[string][]byte // path -> the page
+	files  fs.FS             // its scripts
+	search []byte            // /docs/search.json
 }
 
 // buildSite renders every page from the templates in files.
@@ -194,6 +196,10 @@ func buildSite(files fs.FS) (*site, error) {
 			return nil, fmt.Errorf("%s: %w", p.File, err)
 		}
 		s.pages[p.Path] = b.Bytes()
+	}
+	idx := searchIndex(d, s.pages)
+	if s.search, err = json.Marshal(idx); err != nil {
+		return nil, err
 	}
 	return s, nil
 }
@@ -531,6 +537,142 @@ func jsonString(s string) string {
 	return strings.TrimSuffix(b.String(), "\n")
 }
 
+/* --------------------------------- search --------------------------------- */
+
+// searchEntry is one thing the header's search finds.
+type searchEntry struct {
+	Name  string   `json:"name"`
+	Kind  string   `json:"kind"`            // one of searchKinds
+	In    string   `json:"in,omitempty"`    // where it belongs: an argument's action, an event's sensor, a heading's page
+	Text  string   `json:"text,omitempty"`  // what it is, in a few words
+	URL   string   `json:"url"`             // its page and anchor
+	Parts []string `json:"parts,omitempty"` // the parts of the robot it is about
+}
+
+var searchKinds = []string{"Actions", "Arguments", "Events", "Examples", "Pages"}
+
+// searchSynonyms help people who do not know our words: a word of the query also matches these.
+var searchSynonyms = map[string][]string{
+	"light": {"leds", "near", "light_lux"}, "lights": {"leds"}, "led": {"leds"}, "lamp": {"leds"},
+	"colour": {"color"}, "color": {"colour"},
+	"photo": {"image", "picture"}, "picture": {"image"}, "image": {"picture"}, "jpeg": {"image"}, "png": {"image"},
+	"touch": {"tap", "long_press", "pat", "pet", "stroke"}, "press": {"tap", "long_press", "button"},
+	"speak": {"say", "sound"}, "talk": {"say"}, "speech": {"say"}, "bubble": {"say"}, "voice": {"say", "sound"},
+	"music": {"sound", "notes"}, "melody": {"notes"}, "beep": {"chime"}, "play": {"sound"}, "volume": {"sound"},
+	"question": {"ask"}, "choice": {"ask"}, "menu": {"ask"}, "confirm": {"ask"},
+	"nfc": {"tag"}, "card": {"show", "tag"}, "sticker": {"command"},
+	"turn": {"move", "yaw"}, "look": {"move", "yaw", "pitch"}, "servo": {"move"}, "neck": {"move"},
+	"text": {"show", "say"}, "display": {"show", "screen"}, "screen": {"show"}, "clear": {"show"},
+	"emotion": {"face"}, "smile": {"face", "happy"}, "mood": {"face", "emotion"},
+	"listen": {"events"}, "wait": {"events"}, "event": {"events"}, "input": {"events"},
+	"battery": {"state", "battery_pct"}, "sensor": {"state", "readings"}, "sensors": {"state", "readings"}, "reading": {"readings", "state"},
+	"agent": {"mcp"}, "ai": {"mcp", "agent"}, "claude": {"mcp", "agent"},
+	"token": {"key"}, "password": {"key"},
+	"ir": {"remote", "infrared"}, "infrared": {"remote"}, "tv": {"remote"},
+	"usb": {"plugged", "unplugged"}, "power": {"button", "plugged"}, "charging": {"plugged", "state"},
+	"shake": {"shaken"}, "pick": {"picked_up"}, "lift": {"picked_up"},
+	"raw": {"command"}, "protocol": {"command"},
+}
+
+// searchIndex lists every action, argument, event, example, page and section of the site.
+func searchIndex(d siteData, pages map[string][]byte) map[string]any {
+	var out []searchEntry
+	have := map[string]bool{}
+	add := func(e searchEntry) {
+		if !have[e.URL] {
+			have[e.URL] = true
+			out = append(out, e)
+		}
+	}
+	for _, p := range d.Parts {
+		for _, a := range p.Actions {
+			add(searchEntry{Name: a.Name, Kind: "Actions", Text: a.Help, URL: "/docs/api#" + a.Name, Parts: []string{p.Name}})
+		}
+	}
+	for _, p := range d.Parts {
+		for _, a := range p.Actions {
+			for _, prm := range a.Params {
+				text := prm.Help
+				if len(prm.Enum) > 0 {
+					text += ": " + strings.Join(prm.Enum, ", ")
+				}
+				add(searchEntry{Name: prm.Name, Kind: "Arguments", In: a.Name, Text: text, URL: "/docs/api#" + a.Name + "-" + prm.Name, Parts: []string{p.Name}})
+			}
+		}
+	}
+	for _, g := range d.Events {
+		for _, e := range g.Events {
+			add(searchEntry{Name: e.Name, Kind: "Events", In: g.Name, Text: e.Means, URL: "/docs/api#ev-" + e.Name, Parts: []string{g.Name}})
+		}
+	}
+	for _, ex := range d.Examples {
+		var parts []string
+		for _, p := range ex.Parts {
+			parts = append(parts, p.Name)
+		}
+		add(searchEntry{Name: ex.Title, Kind: "Examples", Text: ex.What, URL: "/docs/examples#ex-" + ex.ID, Parts: parts})
+	}
+	for _, p := range sitePages {
+		pageEntries(p, string(pages[p.Path]), add)
+	}
+	return map[string]any{"kinds": searchKinds, "entries": out, "synonyms": searchSynonyms}
+}
+
+var (
+	headingRe     = regexp.MustCompile(`(?s)<h([12])(?: id="([^"]*)")?>(.*?)</h[12]>`)
+	nextHeadRe    = regexp.MustCompile(`<h[1-6][ >]`)
+	noscriptRe    = regexp.MustCompile(`(?s)<noscript>.*?</noscript>`)
+	tagRe         = regexp.MustCompile(`(?s)<[^>]*>`)
+	spaceBeforeRe = regexp.MustCompile(` ([,.;:!?)])`)
+)
+
+// pageEntries are a page's title and its sections (h2 with an id), each with the text under it.
+func pageEntries(p sitePage, page string, add func(searchEntry)) {
+	start, end := strings.Index(page, `<main id="main">`), strings.Index(page, "</main>")
+	if start < 0 || end < start {
+		return
+	}
+	main := noscriptRe.ReplaceAllString(page[start:end], "")
+	for _, m := range headingRe.FindAllStringSubmatchIndex(main, -1) {
+		level, id := main[m[2]:m[3]], ""
+		if m[4] >= 0 {
+			id = main[m[4]:m[5]]
+		}
+		e := searchEntry{Name: plainText(main[m[6]:m[7]]), Kind: "Pages", URL: p.Path}
+		switch {
+		case level == "1":
+			e.Name = p.Title
+		case id == "":
+			continue
+		default:
+			e.In, e.URL = p.Title, p.Path+"#"+id
+		}
+		rest := main[m[1]:]
+		if i := nextHeadRe.FindStringIndex(rest); i != nil {
+			rest = rest[:i[0]]
+		}
+		e.Text = shorten(plainText(rest), 240)
+		add(e)
+	}
+}
+
+// plainText is HTML as text: tags gone, spaces collapsed, none left before punctuation.
+func plainText(h string) string {
+	s := strings.Join(strings.Fields(html.UnescapeString(tagRe.ReplaceAllString(h, " "))), " ")
+	return spaceBeforeRe.ReplaceAllString(strings.ReplaceAll(s, "( ", "("), "$1")
+}
+
+// shorten cuts s to about n bytes at a space.
+func shorten(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	if i := strings.LastIndexByte(s[:n], ' '); i > 0 {
+		return s[:i] + " …"
+	}
+	return s[:n]
+}
+
 /* --------------------------------- serving -------------------------------- */
 
 // siteNow is the rendered site; from disk, rendered now, with Config.UIDir.
@@ -556,6 +698,18 @@ func (a *App) handlePage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Write(b)
+}
+
+// handleSearch serves the search's index: every action, argument, event, example and section.
+func (a *App) handleSearch(w http.ResponseWriter, r *http.Request) {
+	s, err := a.siteNow()
+	if err != nil {
+		http.Error(w, "the site: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Write(s.search)
 }
 
 // handleSiteFile serves the site's scripts.

@@ -258,6 +258,7 @@ func (a *App) Handler() http.Handler {
 		mux.HandleFunc(pattern, a.trySignIn(a.handlePage))
 	}
 	mux.HandleFunc("GET /site/{file}", a.handleSiteFile)
+	mux.HandleFunc("GET /docs/search.json", a.handleSearch)
 	mux.HandleFunc("GET /pair", a.handlePair)
 	mux.HandleFunc("GET /auth/login", a.handleLogin)
 	mux.HandleFunc("GET /auth/sso", a.handleSSOReturn)

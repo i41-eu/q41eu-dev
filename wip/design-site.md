@@ -1,8 +1,8 @@
 # Dev's site and the dev package: design
 
-**Status:** design, 2026-10-12. Step 1 of the plan (section 10: the pages and the language
-selector) is built and described in [docs/site.md](../docs/site.md); its sections here keep only
-what is still to come. The rest is a plan (docs describe only what exists, so it lives in
+**Status:** design, 2026-10-12. Steps 1 and 2 of the plan (section 10: the pages, the language
+selector and the search) are built and described in [docs/site.md](../docs/site.md); their
+sections here keep only what is still to come. The rest is a plan (docs describe only what exists, so it lives in
 `wip/`). Names of new actions, events and files are proposals.
 
 **The request** (the project's owner, 2026-10-12): a much better web site for dev.q41.eu.
@@ -55,8 +55,8 @@ What it lacks: a language choice across the page, search, an API reference by ro
 the robot's readings, anything beyond the ten actions, advanced apps, and a JavaScript
 client usable outside this page.
 
-Since then, in the repository (not released yet): step 1, five pages with the language selector
-([docs/site.md](../docs/site.md)), and the four examples in every language: JavaScript files for
+Since then, in the repository (not released yet): steps 1 and 2, five pages with the language
+selector and the search ([docs/site.md](../docs/site.md)), and the four examples in every language: JavaScript files for
 Node in `examples/js` (each with its own `act`, as the Python ones; the library of section 3.2
 is still to come), build status in curl, and each example for an agent in `examples/mcp`.
 
@@ -280,8 +280,8 @@ build an app (the kit, the case studies).
 links, the search box, the language chips, the account.
 
 Built (step 1, [docs/site.md](../docs/site.md)): `/`, `/robots`, `/docs/start`, `/docs/api`
-(the parts of today's actions, the events by sensor), `/docs/examples`, the header (without the
-search box). The other pages come with the steps that make them true.
+(the parts of today's actions, the events by sensor), `/docs/examples`, the header (with the
+search box, step 2). The other pages come with the steps that make them true.
 
 ### 5.3 The language selector
 
@@ -314,18 +314,11 @@ Each part's section, made from the catalog and the action table:
 
 ### 5.6 Search
 
-- **A box in the header;** `/` focuses it, Enter opens the first result, Esc closes. Results
-  appear under it as you type, grouped: Actions, Arguments, Events, Readings, Helpers,
-  Examples, Pages.
-- **The index** (`/docs/search.json`, made at start from the same data, a few tens of KB)
-  has an entry per action, argument, event, reading, helper, example and page heading:
-  name, kind, a short text, the page and anchor, the parts it belongs to.
-- **Matching:** words of the query against names (exact, then prefix) and texts (contains);
-  names weigh more; a small synonym table helps people who do not know our words
-  ("light" → LEDs and `light_lux`, "photo" → snapshot and image upload, "touch" → tap, pat,
-  touch stream, "speak" → say, sound, speech, "colour"/"color"). About a hundred lines of
-  JavaScript; no library, no server.
-- Search works offline on a Dev at home, like the rest.
+Built in step 2 as designed here (a box in the header, `/`, Enter, Esc, results grouped as you
+type, `/docs/search.json` made at start, names before texts, synonyms, no library, offline):
+[docs/site.md](../docs/site.md#search). Still to come: readings and helpers join the index (and
+the synonyms that lead to them, "photo" to `snapshot`) with the steps that make them exist (5,
+F, H).
 
 ### 5.7 Examples
 
@@ -735,7 +728,7 @@ Each step is a release that is useful on its own, in this order. Tests: `gofmt`,
 | # | Step | Repo | What changes | Tested by |
 |---|---|---|---|---|
 | 1 | **Pages and the language selector** (built: [docs/site.md](../docs/site.md)) | q41eu-dev | the page split into Home, Your robots, Start, API, Examples; the header with the chips (curl, Python, JavaScript, Go, MCP), side by side or tabs, remembered; the four examples in all their languages; `/pair` to `/robots` | a test renders every page: every example in each of its languages, every internal link answers 200; the readme's table equals the action table; a look at phone width |
-| 2 | **Search** | q41eu-dev | `/docs/search.json` (actions, arguments, events, examples, pages, synonyms), the box in the header | a test: the index has every action, argument, event, example and page heading |
+| 2 | **Search** (built: [docs/site.md](../docs/site.md#search)) | q41eu-dev | `/docs/search.json` (actions, arguments, events, examples, pages, synonyms), the box in the header | a test: the index has every action, argument, event, example and page heading |
 | 3 | **Case studies, first version** | q41eu-dev | Focus and Pet as they are today: what `robothub` and `sound` do for them, mapped to their code; each later step adds its piece when it lands | links checked; reviewed against the apps' code |
 | 4 | **The protocol catalog** | i41eu-arch (one line in the spec), q41eu-raw | `wire/catalog.go`; `fake-robot` from it; `screen_snapshot` and `speaker_flush` documented; the readme's Commands table checked | q41eu-raw tests: readme ↔ catalog, fake-robot ↔ catalog |
 | 4b | `camera_mic_off` declared in `Register` | i41eu-StackChan | one line in the readings list | a robot's `Register` (devcheck in step 5) |

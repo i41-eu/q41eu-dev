@@ -14,8 +14,8 @@ offline, as dev.q41.eu. What comes next for it is planned in
 | `/docs/api` | The API by part | calling an action (the helper per language, the answers and errors), then a section per part of the robot: screen and face, head, LEDs, speaker, questions, what people do (the events, by the sensor that notices them), state and readings, any robot command; each action with its arguments and one call in each language |
 | `/docs/examples` | Examples | every example in every language (the files themselves, with Copy and Download), the parts of the robot it uses, **Run** |
 
-The header on every page: the page links, the account (Sign in or out through the manager, a
-link to the manager), the language chips. The robot's QR code (`/pair?code=…`) pairs the browser
+The header on every page: the page links, the search box, the account (Sign in or out through
+the manager, a link to the manager), the language chips. The robot's QR code (`/pair?code=…`) pairs the browser
 and goes to `/robots`. With `-manager-sign-in`, every page first tries the silent sign-in.
 
 ## Languages
@@ -40,6 +40,26 @@ and goes to `/robots`. With `-manager-sign-in`, every page first tries the silen
 Each code block has its language, how to run it (examples), **Copy**, and **Download** (example
 files). **Run** runs an example on the first robot paired with this browser, through the page's
 own session, and shows what it prints: a JavaScript copy of the example's steps, in `site.js`.
+
+## Search
+
+- **A box in the header** of every page. `/` goes to it (unless you are typing somewhere else);
+  results show under it as you type, grouped (actions, arguments, events, examples, pages), the
+  best first; the arrow keys move through them, Enter opens the one picked (or the first), Escape
+  closes them (a second Escape clears the box). It is a combobox with a listbox for screen
+  readers, and a polite count of the results.
+- **The index,** `/docs/search.json` (about 20 KB), is made at start from the same data as the
+  pages: an entry per action, argument (with its choices: `tada` finds `chime`), event, example,
+  page and section (an `h2` with an id, with the text under it). Each has its name, kind, a short
+  text, where it belongs (an argument's action, an event's sensor, a section's page), the parts of
+  the robot, and its page and anchor. The page fetches it once, the first time the box is used.
+- **Matching,** in `site.js`, no library: every word of the query must match (small words like
+  "the" and "with" are left out); a whole name counts most, then the start of a name or of a word
+  in it, then a word of the text. A small table of synonyms (`searchSynonyms` in `site.go`) helps
+  people who do not know our words: "touch" also looks for `tap`, `pat`, `pet`, `stroke`;
+  "light" for `leds` and `near`; "photo" for `image`; "speak" for `say` and `sound`; "colour"
+  and "color"; "agent" for MCP; a synonym counts a little less than the word itself.
+- Like the rest, it works offline on a Dev at home, and without JavaScript the box is hidden.
 
 ## How it is made
 
@@ -67,9 +87,13 @@ own session, and shows what it prints: a JavaScript copy of the example's steps,
   the built-in ones.
 - `TestSnippets`: each action's example passes the API's own argument check, and so does each
   tool call in the MCP examples.
+- `TestSearchIndex`: the index has every action, argument, event, example, page and section,
+  each once and pointing at an anchor that exists; every synonym leads to a word the site has.
 - `TestReadmeTable`: the readme's API table lists the actions, in order.
 - `TestPagesInBrowser`, in a headless Chrome or Chromium when one is installed (`$CHROME`, or on
   `PATH`; skipped with `-short`): the language selector (all on by default; off by a click and by
   the keyboard; remembered, on another page too; the last one off turns all on; `?lang=` and
   Keep; tabs; storage blocked), the robot's card (paired by the QR code's link, Try it, a new key,
-  an event, Run), and no page wider than a 390 px phone.
+  an event, Run), the search (`/` to the box, an action found by its name and an example by what
+  it does, the arrow keys, Enter, Escape, a synonym, nothing found), and no page, nor the search's
+  results, wider than a 390 px phone.

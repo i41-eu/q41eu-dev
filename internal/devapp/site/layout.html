@@ -39,6 +39,14 @@
 <header class="top">
   <div class="bar">
     <nav class="pages" aria-label="Pages">{{range .Pages}}<a href="{{.Path}}"{{if eq .Path "/"}} class="brand"{{end}}{{if eq .Path $.Page.Path}} aria-current="page"{{end}}>{{.Nav}}</a>{{end}}</nav>
+    <div class="search" role="search">
+      <label for="q" class="sr-only">Search the docs</label>
+      <input id="q" type="search" placeholder="Search the docs ( / )" autocomplete="off" spellcheck="false"
+        role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="q-results" aria-describedby="q-help">
+      <span id="q-help" class="sr-only">Results show as you type: arrow keys move through them, Enter opens one, Escape closes them. The slash key brings you back here.</span>
+      <div id="q-results" class="results" role="listbox" aria-label="Search results" hidden></div>
+      <span id="q-status" class="sr-only" role="status"></span>
+    </div>
     <span class="acct" id="acct"></span>
   </div>
   <div class="bar">

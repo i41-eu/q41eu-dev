@@ -66,6 +66,8 @@ Dev serves its own docs, built into the binary (a Dev at home has them offline):
   agent): all on by default, several at once, remembered in the browser; every code block is
   shown in each language picked, side by side or in tabs. `?lang=python` in a link picks for one
   page.
+- **Search:** a box at the top (`/` goes to it) finds actions, arguments, events, examples and
+  sections as you type, in the page itself (`/docs/search.json`, no service).
 
 ## The API
 
@@ -167,8 +169,9 @@ go run ./cmd/q41eu-dev                  # listens on :8785
   with every screenshot.
 - `go test -race ./...` runs the tests: the hub against a fake robot, the app end to end (pairing,
   keys, actions, a question answered by a tap, events, MCP), the site (every page, every example
-  in every language, the links), and, with Chrome or Chromium installed, the site in a headless
-  browser (the language selector, the robot's card, a phone's width; `-short` skips it).
+  in every language, the links, the search's index), and, with Chrome or Chromium installed, the
+  site in a headless browser (the language selector, the search, the robot's card, a phone's
+  width; `-short` skips it).
 
 ## License
 

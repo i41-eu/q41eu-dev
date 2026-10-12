@@ -18,8 +18,7 @@ kit, so a new robot app is a few hundred lines instead of a few thousand.
 > something better comes along, without migrations.
 
 Part of [i41eu-arch](https://github.com/i41-eu/i41eu-arch), a local first, privacy first platform
-for a home. Stack-chan (スタックチャン) is a registered trademark of Shinya Ishikawa; this project
-is independent and only made to work with Stack-chan robots.
+for a home. Stack-chan (スタックチャン) was created by Shinya Ishikawa and the Stack-chan community ([github.com/stack-chan/stack-chan](https://github.com/stack-chan/stack-chan)); this project is independent of it and of M5Stack.
 
 **Start here:** [getting started](docs/getting-started.md): the robot set up with Dev, a key,
 three variables in your shell, and the [examples](examples/) in curl, Python and Go.

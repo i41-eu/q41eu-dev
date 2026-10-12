@@ -68,13 +68,26 @@ func (a *App) setOwner(id, owner string) {
 	}
 }
 
-// GET /auth/login?next=/path: off to the manager.
+// GET /auth/login?next=/path: off to the manager. With silent=1 (Run on a page, with no robot
+// yet): only a sign-in the browser already has there, tried as on Your robots; when there is
+// nothing to try, back to next at once, with ?signin=no unless signed in here.
 func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if a.cfg.SignIn == nil {
 		http.NotFound(w, r)
 		return
 	}
-	http.Redirect(w, r, a.cfg.SignIn.LoginURL(a.ssoReturn(localPath(r.URL.Query().Get("next"))), false), http.StatusFound)
+	next := localPath(r.URL.Query().Get("next"))
+	if r.URL.Query().Get("silent") != "1" {
+		http.Redirect(w, r, a.cfg.SignIn.LoginURL(a.ssoReturn(next), false), http.StatusFound)
+		return
+	}
+	if a.silentSignIn(w, r, next, true) {
+		return
+	}
+	if !a.signedIn(r) {
+		next = withSignInNo(next)
+	}
+	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
 func (a *App) ssoReturn(next string) string {
@@ -89,31 +102,51 @@ func localPath(next string) string {
 	return next
 }
 
-// trySignIn wraps a page: a browser not signed in here, but signed in at the manager lately (its
-// hint cookie, sso.HintCookie; or any browser with SignInAlways), goes there silently once and
-// comes back signed in.
-func (a *App) trySignIn(page http.HandlerFunc) http.HandlerFunc {
+// trySignIn wraps a page that shows the person's robots: a browser not signed in here, but
+// signed in at the manager lately (its hint cookie, sso.HintCookie), goes there silently once and
+// comes back signed in. anyBrowser: also a browser without the hint, when Config.SignInAlways (Dev
+// on another domain than the manager's, where the hint cannot be seen). The docs pages are not
+// wrapped: they answer every request as they are, a search engine's and a link preview's too.
+func (a *App) trySignIn(page http.HandlerFunc, anyBrowser bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if a.cfg.SignIn == nil || r.URL.Query().Has("signin") {
+		if a.cfg.SignIn == nil || r.URL.Query().Has("signin") || !a.silentSignIn(w, r, r.URL.RequestURI(), anyBrowser) {
 			page(w, r)
-			return
 		}
-		hint := sso.SilentTry(r, ssoTriedCookie, a.cfg.SignInAlways)
-		if hint == "" {
-			page(w, r)
-			return
-		}
-		a.mu.Lock()
-		_, s := a.sessionOfLocked(r)
-		signedIn := s != nil && s.Account != nil
-		a.mu.Unlock()
-		if signedIn {
-			page(w, r)
-			return
-		}
-		sso.MarkTried(w, ssoTriedCookie, hint, strings.HasPrefix(a.cfg.PublicURL, "https://"))
-		http.Redirect(w, r, a.cfg.SignIn.LoginURL(a.ssoReturn(r.URL.RequestURI()), true), http.StatusFound)
 	}
+}
+
+// silentSignIn sends a browser not signed in here to the manager for a silent sign-in, back to
+// next, at most once per sso.RetryAfter: when the manager's hint cookie names it, or (anyBrowser
+// and Config.SignInAlways) any browser. False: nothing to try, nothing written.
+func (a *App) silentSignIn(w http.ResponseWriter, r *http.Request, next string, anyBrowser bool) bool {
+	hint := sso.SilentTry(r, ssoTriedCookie, anyBrowser && a.cfg.SignInAlways)
+	if hint == "" || a.signedIn(r) {
+		return false
+	}
+	sso.MarkTried(w, ssoTriedCookie, hint, strings.HasPrefix(a.cfg.PublicURL, "https://"))
+	http.Redirect(w, r, a.cfg.SignIn.LoginURL(a.ssoReturn(next), true), http.StatusFound)
+	return true
+}
+
+// signedIn: the browser's session here is signed in through the manager.
+func (a *App) signedIn(r *http.Request) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	_, s := a.sessionOfLocked(r)
+	return s != nil && s.Account != nil
+}
+
+// withSignInNo is the local path next with ?signin=no: a silent sign-in came back without one (or
+// was not tried), so the page shows as it is and does not try again.
+func withSignInNo(next string) string {
+	u, err := url.Parse(next)
+	if err != nil {
+		return "/?signin=no"
+	}
+	v := u.Query()
+	v.Set("signin", "no")
+	u.RawQuery = v.Encode()
+	return u.String()
 }
 
 // GET /auth/sso?next=…&code=… (or &error=…): back from the manager.
@@ -125,11 +158,7 @@ func (a *App) handleSSOReturn(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	next := localPath(q.Get("next"))
 	if q.Get("code") == "" { // not signed in at the manager (silent), or cancelled
-		u, _ := url.Parse(next)
-		v := u.Query()
-		v.Set("signin", "no")
-		u.RawQuery = v.Encode()
-		http.Redirect(w, r, u.String(), http.StatusSeeOther)
+		http.Redirect(w, r, withSignInNo(next), http.StatusSeeOther)
 		return
 	}
 	ans, err := a.cfg.SignIn.Exchange(r.Context(), q.Get("code"))

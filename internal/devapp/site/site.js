@@ -193,9 +193,19 @@ const Dev = (() => {
     const lines = [];
     const log = (t) => { lines.push(t); out.textContent = lines.join("\n"); out.hidden = false; };
     const run = RUNS[b.dataset.run];
-    const id = state && state.robots.length ? state.robots[0].id : "";
     if (!run) { log("✗ not runnable here"); return; }
-    if (!id) { log("✗ pair a robot first: Your robots"); return; }
+    if (!state) await load().catch(() => {});
+    const id = state && state.robots.length ? state.robots[0].id : "";
+    const me = (state && state.me) || {};
+    if (!id && me.sign_in && !me.signed_in && !new URLSearchParams(location.search).has("signin")) {
+      // Signed in at the manager, maybe: a silent sign-in there and back to this example (Dev
+      // tries it at most once in ten minutes, and comes back with ?signin=no when it did).
+      const at = b.closest("section")?.querySelector("h2[id]")?.id || "";
+      log("signing in through the manager, to find your robots…");
+      location.href = "/auth/login?silent=1&next=" + encodeURIComponent(location.pathname + (at ? "#" + at : ""));
+      return;
+    }
+    if (!id) { log("✗ pair a robot first: Your robots" + (me.sign_in && !me.signed_in ? ", or Sign in at the top" : "")); return; }
     b.disabled = true;
     const events = (after, seconds) => fetch(`/v1/robots/${encodeURIComponent(id)}/events?after=${after}&seconds=${seconds}`,
       { headers: { "X-Requested-With": "dev" } }).then((r) => r.json());

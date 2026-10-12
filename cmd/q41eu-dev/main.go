@@ -44,7 +44,7 @@ func main() {
 		mgrURL       = flag.String("manager-url", "", "the Stackchan manager that set robots up with tokens for this app (\"\" = none)")
 		mgrSecret    = flag.String("manager-secret-file", "", "file with this app's secret at the manager")
 		mgrSignIn    = flag.Bool("manager-sign-in", false, "sign in through the manager (-manager-url): the owner's browsers get their robots without the QR code")
-		signInAlways = flag.Bool("sign-in-always", false, "with -manager-sign-in: try a silent sign-in at the manager also without its hint cookie (this app on another domain than the manager's -sign-in-hint-domain), at most once per 10 minutes per browser")
+		signInAlways = flag.Bool("sign-in-always", false, "with -manager-sign-in: on Your robots (and Run without a robot) try a silent sign-in at the manager also without its hint cookie (this app on another domain than the manager's -sign-in-hint-domain), at most once per 10 minutes per browser; the docs pages never redirect")
 		proxies      = flag.Int("trusted-proxies", 0, "reverse proxies in front of this server that append the client address to X-Forwarded-For (0: trust no header)")
 	)
 	flag.Parse()

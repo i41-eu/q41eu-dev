@@ -251,11 +251,14 @@ func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET "+wire.ConnectPath, a.hub)
 	for _, p := range sitePages {
-		pattern := "GET " + p.Path
-		if p.Path == "/" {
-			pattern = "GET /{$}"
-		}
-		mux.HandleFunc(pattern, a.trySignIn(a.handlePage))
+		pattern, page := "GET "+p.Path, a.handlePage
+		switch p.Path {
+		case "/robots": // the person's robots: a browser signed in at the manager gets them silently
+			page = a.trySignIn(page, true)
+		case "/": // home shows them too, but goes to the manager only for a browser its hint cookie names
+			pattern, page = "GET /{$}", a.trySignIn(page, false)
+		} // the docs pages answer everyone at once, as they are
+		mux.HandleFunc(pattern, page)
 	}
 	mux.HandleFunc("GET /site/{file}", a.handleSiteFile)
 	mux.HandleFunc("GET /docs/search.json", a.handleSearch)

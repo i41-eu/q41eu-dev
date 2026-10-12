@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/i41-eu/q41eu-raw/sso"
 )
 
 func findChrome() string {
@@ -519,6 +521,31 @@ func TestPagesInBrowser(t *testing.T) {
 		b.waitFor("nothing found for "+nothing, `!!document.querySelector("#q-results .none") && document.getElementById("q-results").textContent.includes(`+fmt.Sprintf("%q", nothing)+`)`)
 	}
 	b.noErrors("the search")
+
+	// With sign-in through a manager (here one where nobody is signed in): the docs show at once;
+	// Run without a robot tries the silent sign-in, comes back to its example, and does not again.
+	mgr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, r.URL.Query().Get("return")+"&error=login_required", http.StatusFound)
+	}))
+	defer mgr.Close()
+	sa := New(Config{SignIn: sso.New(mgr.URL, "secret"), SignInAlways: true, ManagerURL: mgr.URL, Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	ss := httptest.NewServer(sa.Handler())
+	defer ss.Close()
+	sa.cfg.PublicURL = ss.URL
+	b.open(ss.URL + "/docs/examples")
+	b.waitFor("Sign in in the header", `[...document.querySelectorAll("#acct a")].some((x) => x.textContent === "Sign in")`)
+	if !b.is(`location.search === "" && location.pathname === "/docs/examples"`) {
+		t.Fatal("a docs page went to the manager")
+	}
+	b.eval(`window.__stale = true; document.querySelector(".run[data-run=hello]").click()`, nil)
+	b.waitFor("back from the silent sign-in", `!window.__stale && location.search === "?signin=no" && location.hash === "#ex-hello" && typeof Dev === "object" && document.readyState === "complete"`)
+	b.waitFor("the state", `[...document.querySelectorAll("#acct a")].some((x) => x.textContent === "Sign in")`)
+	b.eval(`document.querySelector(".run[data-run=hello]").click()`, nil)
+	b.waitFor("Run's answer", `document.getElementById("ex-hello").closest("section").querySelector(".out").textContent.includes("pair a robot first")`)
+	if !b.is(`location.search === "?signin=no"`) {
+		t.Fatal("Run tried the silent sign-in twice")
+	}
+	b.noErrors("sign-in")
 
 	// Phone width: no page scrolls sideways.
 	b.call("Emulation.setDeviceMetricsOverride", map[string]any{"width": 390, "height": 844, "deviceScaleFactor": 2, "mobile": true}, nil)

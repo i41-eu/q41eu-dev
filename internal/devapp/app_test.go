@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -455,5 +456,92 @@ func TestSignIn(t *testing.T) {
 	res.Body.Close()
 	if st["me"].(map[string]any)["signed_in"] == true {
 		t.Fatal("still signed in after signing out")
+	}
+}
+
+// The docs pages and Home answer an anonymous request at once, with the page (a search engine, a
+// link preview, curl); Your robots, and Run with silent=1, try the silent sign-in at the manager,
+// once in a while; Home only for a browser the manager's hint cookie names.
+func TestSignInPages(t *testing.T) {
+	const mgr = "https://manager.example"
+	a := New(Config{SignIn: sso.New(mgr, "secret"), SignInAlways: true, Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+	a.cfg.PublicURL = ts.URL
+	client := func() *http.Client { // a browser that does not follow redirects, so they can be checked
+		jar, _ := cookiejar.New(nil)
+		return &http.Client{Jar: jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	}
+	get := func(c *http.Client, path string, hint bool) (*http.Response, string) {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodGet, ts.URL+path, nil)
+		if hint {
+			req.AddCookie(&http.Cookie{Name: sso.HintCookie, Value: "h1"})
+		}
+		res, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		return res, string(b)
+	}
+	silent := func(res *http.Response) bool {
+		loc := res.Header.Get("Location")
+		return res.StatusCode == http.StatusFound && strings.HasPrefix(loc, mgr+"/sso?") && strings.Contains(loc, "silent=1")
+	}
+
+	for _, p := range sitePages {
+		res, body := get(client(), p.Path, false)
+		if p.Path == "/robots" {
+			if !silent(res) {
+				t.Errorf("%s: %d %q, want the silent sign-in", p.Path, res.StatusCode, res.Header.Get("Location"))
+			}
+			continue
+		}
+		if res.StatusCode != http.StatusOK || res.Header.Get("Location") != "" || res.Header.Get("Set-Cookie") != "" || !strings.Contains(body, "<h1>") {
+			t.Errorf("%s: %d, Location %q, Set-Cookie %q: want the page itself", p.Path, res.StatusCode, res.Header.Get("Location"), res.Header.Get("Set-Cookie"))
+		}
+	}
+	if res, _ := get(client(), "/", true); !silent(res) {
+		t.Errorf("home with the manager's hint: %d, want the silent sign-in", res.StatusCode)
+	}
+	if res, _ := get(client(), "/docs/api", true); res.StatusCode != http.StatusOK {
+		t.Errorf("a docs page with the manager's hint: %d", res.StatusCode)
+	}
+
+	// Your robots tries once; then the page, without going there again.
+	c := client()
+	if res, _ := get(c, "/robots", false); !silent(res) {
+		t.Fatalf("/robots: %d", res.StatusCode)
+	}
+	if res, _ := get(c, "/robots", false); res.StatusCode != http.StatusOK {
+		t.Fatalf("/robots tried again: %d %q", res.StatusCode, res.Header.Get("Location"))
+	}
+
+	// Run on a page without a robot: silent=1 goes to the manager, back to the example; tried
+	// lately, straight back with ?signin=no.
+	c = client()
+	run := "/auth/login?silent=1&next=" + url.QueryEscape("/docs/examples#ex-hello")
+	if res, _ := get(c, run, false); !silent(res) || !strings.Contains(res.Header.Get("Location"), url.QueryEscape(a.ssoReturn("/docs/examples#ex-hello"))) {
+		t.Fatalf("Run's sign-in: %d %q", res.StatusCode, res.Header.Get("Location"))
+	}
+	if res, _ := get(c, run, false); res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/docs/examples?signin=no#ex-hello" {
+		t.Fatalf("Run's sign-in again: %d %q", res.StatusCode, res.Header.Get("Location"))
+	}
+	if res, _ := get(client(), "/auth/login?silent=1&next=//elsewhere.example", false); !strings.Contains(res.Header.Get("Location"), url.QueryEscape(a.ssoReturn("/"))) {
+		t.Fatalf("next elsewhere: %q", res.Header.Get("Location"))
+	}
+
+	// Dev on the manager's domain (no SignInAlways): only a browser with the hint goes there.
+	a.cfg.SignInAlways = false
+	if res, _ := get(client(), "/robots", false); res.StatusCode != http.StatusOK {
+		t.Errorf("/robots without the hint: %d", res.StatusCode)
+	}
+	if res, _ := get(client(), "/robots", true); !silent(res) {
+		t.Errorf("/robots with the hint: %d", res.StatusCode)
+	}
+	if res, _ := get(client(), run, false); res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/docs/examples?signin=no#ex-hello" {
+		t.Errorf("Run's sign-in without the hint: %d %q", res.StatusCode, res.Header.Get("Location"))
 	}
 }

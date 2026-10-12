@@ -16,7 +16,16 @@ offline, as dev.q41.eu. What comes next for it is planned in
 
 The header on every page: the page links, the search box, the account (Sign in or out through
 the manager, a link to the manager), the language chips. The robot's QR code (`/pair?code=…`) pairs the browser
-and goes to `/robots`. With `-manager-sign-in`, every page first tries the silent sign-in.
+and goes to `/robots`.
+
+**Sign-in** (`-manager-sign-in`): the docs pages answer every request as they are, with no
+redirect (a search engine, a link preview, `curl`); the header learns whether the browser is
+signed in from the page's own fetch of its state (`/api/state`). Only what needs the person's
+robots goes to the manager for the silent sign-in (at most once in ten minutes, back with
+`?signin=no` when nobody is signed in there): **Your robots** on load (with `-sign-in-always`,
+any browser; else one the manager's hint cookie names), **Home** only for a browser the hint
+cookie names, and **Run** on a page with no robot yet (`/auth/login?silent=1`, back to its
+example). **Sign in** in the header signs in for real.
 
 ## Languages
 

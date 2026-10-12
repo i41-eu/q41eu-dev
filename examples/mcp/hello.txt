@@ -1,0 +1,12 @@
+hello: a card on the robot's screen, its LEDs, a nod and a chime.
+
+Ask your agent (Dev added as an MCP server: getting started, step 5):
+
+  Say hello on the robot: a green card "Hello", green LEDs, a nod and the tada chime.
+
+The tool calls it makes:
+
+robot_show {"title": "Hello", "text": "from an agent", "note": "q41eu-dev examples", "color": "green"}
+robot_leds {"color": "green"}
+robot_move {"gesture": "nod"}
+robot_sound {"chime": "tada"}

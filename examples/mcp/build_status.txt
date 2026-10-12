@@ -1,0 +1,16 @@
+build status: runs a command and shows on the robot how it went: blue while it runs, then a
+green card and a chime when it passed, a red card and a shake when it failed.
+
+Ask your agent (Dev added as an MCP server: getting started, step 5):
+
+  Run make test, and show on the robot how it goes: blue while it runs, then green with
+  the tada chime and a nod, or red with the error chime and a shake.
+
+The tool calls it makes around the command (here: the tests passed):
+
+robot_show {"title": "Running", "text": "make test", "color": "blue"}
+robot_leds {"effect": "breathe", "color": "blue"}
+robot_show {"title": "Passed", "text": "All good", "note": "make test · 42 s", "color": "green", "progress": 1}
+robot_leds {"color": "green"}
+robot_sound {"chime": "tada"}
+robot_move {"gesture": "nod"}

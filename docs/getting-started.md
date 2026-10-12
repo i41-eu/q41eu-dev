@@ -49,20 +49,22 @@ robot's card on m.i41.eu, and delete it in either place.
 git clone https://github.com/i41-eu/q41eu-dev && cd q41eu-dev
 sh examples/curl/hello.sh                         # curl
 python3 examples/python/hello.py                  # Python 3, the standard library only
+node examples/js/hello.mjs                        # JavaScript: Node 18 or newer, only fetch
 go run ./examples/go/hello                        # Go, with the client package
 ```
 
-| Example | What it shows | curl | Python | Go |
-|---|---|---|---|---|
-| hello | a card, green LEDs, a nod, a chime | [hello.sh](../examples/curl/hello.sh) | [hello.py](../examples/python/hello.py) | [hello](../examples/go/hello/main.go) |
-| ask | a question with buttons; prints the answer tapped | [ask.sh](../examples/curl/ask.sh) | [ask.py](../examples/python/ask.py) | [ask](../examples/go/ask/main.go) |
-| build status | runs a command (your tests): blue while it runs, then green and a chime, or red and a shake | | [build_status.py](../examples/python/build_status.py) | [buildstatus](../examples/go/buildstatus/main.go) |
-| events | prints what people do at the robot; a pat makes it chirp and smile, a tag shows its text | [events.sh](../examples/curl/events.sh) | [events.py](../examples/python/events.py) | [events](../examples/go/events/main.go) |
+| Example | What it shows | curl | Python | JavaScript | Go | MCP |
+|---|---|---|---|---|---|---|
+| hello | a card, green LEDs, a nod, a chime | [hello.sh](../examples/curl/hello.sh) | [hello.py](../examples/python/hello.py) | [hello.mjs](../examples/js/hello.mjs) | [hello](../examples/go/hello/main.go) | [hello](../examples/mcp/hello.txt) |
+| ask | a question with buttons; prints the answer tapped | [ask.sh](../examples/curl/ask.sh) | [ask.py](../examples/python/ask.py) | [ask.mjs](../examples/js/ask.mjs) | [ask](../examples/go/ask/main.go) | [ask](../examples/mcp/ask.txt) |
+| build status | runs a command (your tests): blue while it runs, then green and a chime, or red and a shake | [build_status.sh](../examples/curl/build_status.sh) | [build_status.py](../examples/python/build_status.py) | [build_status.mjs](../examples/js/build_status.mjs) | [buildstatus](../examples/go/buildstatus/main.go) | [build status](../examples/mcp/build_status.txt) |
+| events | prints what people do at the robot; a pat makes it chirp and smile, a tag shows its text | [events.sh](../examples/curl/events.sh) | [events.py](../examples/python/events.py) | [events.mjs](../examples/js/events.mjs) | [events](../examples/go/events/main.go) | [events](../examples/mcp/events.txt) |
 
-Dev's page has the same examples with a **Run** button each, which does the same from the page.
+The MCP column is for an AI agent (section 5): what to ask it, and the tool calls it makes. Dev's
+page has the same examples with a **Run** button each, which does the same from the page.
 
 Without a clone: `go run github.com/i41-eu/q41eu-dev/examples/go/hello@latest`, or copy a Python
-file: each one stands alone.
+or JavaScript file: each one stands alone.
 
 ## 5. An AI agent
 

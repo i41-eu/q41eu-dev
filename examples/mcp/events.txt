@@ -1,0 +1,16 @@
+events: what people do at the robot, and answers to some of it: a pat on the head makes it
+chirp and smile, a tag held near shows what the tag says.
+
+Ask your agent (Dev added as an MCP server: getting started, step 5):
+
+  For the next five minutes, watch the robot: when someone pats its head, smile and
+  chirp; when a tag is held near it, show what the tag says. Then tell me what happened.
+
+The tool calls it makes, in a loop (each answer's last_seq goes into the next after):
+
+robot_events {"after": 0, "seconds": 0}
+  -> {"events": [...], "last_seq": 41}
+robot_events {"after": 41, "seconds": 30}
+  -> {"events": [{"seq": 42, "name": "pat", "data": {"ms": 300}}], "last_seq": 42}
+robot_face {"emotion": "happy"}
+robot_sound {"chime": "chirp"}

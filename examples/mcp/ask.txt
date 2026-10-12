@@ -1,0 +1,10 @@
+ask: a question on the robot's screen; the person at the robot taps an answer.
+
+Ask your agent (Dev added as an MCP server: getting started, step 5):
+
+  Before you push, ask me on the robot: "Push now?" with Yes and Not yet.
+
+The tool call it makes, and the answer it gets back when you tap Yes:
+
+robot_ask {"question": "Push now?", "answers": ["Yes", "Not yet"]}
+  -> {"answer": "Yes", "index": 0}

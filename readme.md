@@ -21,7 +21,8 @@ Part of [i41eu-arch](https://github.com/i41-eu/i41eu-arch), a local first, priva
 for a home. Stack-chan (スタックチャン) was created by Shinya Ishikawa and the Stack-chan community ([github.com/stack-chan/stack-chan](https://github.com/stack-chan/stack-chan)); this project is independent of it and of M5Stack.
 
 **Start here:** [getting started](docs/getting-started.md): the robot set up with Dev, a key,
-three variables in your shell, and the [examples](examples/) in curl, Python and Go.
+three variables in your shell, and the [examples](examples/) in curl, Python, JavaScript and Go,
+and for an AI agent (MCP).
 
 ## How the pieces fit
 

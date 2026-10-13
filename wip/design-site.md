@@ -461,6 +461,54 @@ file, an event loop) are in the **libraries**. Everything Dev does is built from
 packages**, which apps (Focus, Pet) use too. Each helper below says where its code comes
 from.
 
+### 7.0 Menus and clickmaps as pictures (step H0, ahead of H1 and H2)
+
+The owner asked for menus, clickmaps and image upload. Their picture versions need nothing the
+steps before H bring (the catalog, scopes, the libraries): Dev draws the picture, as it does for
+`ask`, the robot reports the tap (`tap` x, y) and Dev matches it, so they can come first. What
+needs more stays where it is: the sprite menu with icons from files and pages of tiles (7.1),
+the events `menu` and `click` for calls that return at once (7.1, 7.2), and keeping pictures in
+the robot's file store (7.3, F2).
+
+**The API** (old actions unchanged; `ask`, `menu` and `clickmap` share one waiting slot per
+robot, so a newer one ends the older with `{"replaced": true}`):
+
+- `menu {title, items, timeout_s}`: 2-6 items, each a label (`"Apple"`) or an object
+  `{"id", "label", "image"}` (`image`: a JPEG or PNG, base64, drawn in the tile above its label);
+  tiles in a grid under the title (2-3 in a row, 4 as 2×2, 5-6 as 3×2). Answers
+  `{"item", "index", "label"}` for the tile tapped (`item` is its id, else its label),
+  `{"timed_out": true}` (default 30 s, at most 120) or `replaced`.
+- `clickmap {image, regions, timeout_s}`: 1-32 regions in the screen's pixels (320×240), each
+  `{"id", "rect": [x, y, w, h]}`, `{"id", "circle": [x, y, r]}` or
+  `{"id", "polygon": [[x, y], …]}` (3-32 points). `image` (a JPEG or PNG, base64, fitted as
+  `show` fits it) is shown first; without it the regions lie over whatever the screen shows (a
+  card, a picture shown before), so a program can show its picture once and ask again and again.
+  Answers `{"region", "x", "y"}` for the first tap inside a region (where regions overlap, the
+  first listed), `timed_out` or `replaced`. Taps elsewhere change nothing; they come as `tap`
+  events as always.
+
+**Image upload today:** `show {image}` and `clickmap {image}` take a picture as base64; the
+`picture` example sends a file you name, and Try it on Your robots gets a file picker that shows a
+picture from the phone or computer. Pictures kept on the robot stay 7.3 (F2).
+
+**The kit:** `screen.Menu(title, items []screen.MenuItem, accent) (*image.RGBA, []screen.Button)`
+(`MenuItem{Label, Image}`), hit by `screen.Hit` as `ask`'s buttons; `screen.Region` (`ID`, and
+one of `Rect`, `Circle` with `Center` and `R`, `Polygon`) with `Contains(x, y)`, and
+`screen.HitRegion(regions, x, y)`. The Go client gets `Menu` and `Clickmap`.
+
+**Examples,** in curl, Python, JavaScript, Go and for an agent (MCP), with Run on the page:
+`menu` (a snack menu of four tiles; prints the one tapped and says it in a bubble), and `picture`
+(shows a picture, a file you name or `examples/img/quarters.png`, then a clickmap of its four
+quarters; prints the one tapped).
+
+**Tests:** the kit's unit tests (the tiles of 2-6 items inside the screen, apart, hit at their
+middles; each shape's hits and misses, a concave polygon); Dev end to end with the fake robot (a
+tile tapped answers the menu, a tap between tiles does not; a tap in a circle answers the
+clickmap, one outside does not; a newer clickmap replaces a menu; 1 or 7 items, a region without
+a shape, a polygon of 2 points answer 400); the site's tests for the new actions and examples;
+the browser test (Run of both examples answered by a tap at the robot; the file picker); a
+devcheck step each on a real robot (`-tap` answers both).
+
 ### 7.1 Menus
 
 ```json
@@ -751,6 +799,7 @@ Each step is a release that is useful on its own, in this order. Tests: `gofmt`,
 | 8 | **Python library, every action in Go** | q41eu-dev | `sdk/python/q41dev.py` (standard library, one file) at `/sdk/q41dev.py`, the examples on it; `client/actions.go` generated | `TestGenerated`; the Python examples run against a fake robot |
 | 9 | **The example runner** | q41eu-dev | `examples/examples.json`; `TestExamples` runs every example in every language against Dev with a fake robot | itself; CI with sh, python3, node, go |
 | F1–F10 | **The features, one per release** (6.5): F1 screen and stickers with the privacy and pause events; F2 files and image upload; F3 sprites; F4 audio; F5 head extras and the held guard; F6 infrared and sensor switches; F7 `wait_for` and the readings; F8 streams; F9 `screenshot` (after the `0x07` decision); F10 `ping` | q41eu-dev (F9 may need q41eu-raw and the firmware) | per release: the action, its coverage row, snippets in every language (generated), an example, a section of the API by part, a devcheck step | `TestCoverage`, `TestExamples`, devcheck on a real robot with USB screenshots |
+| H0 | **Menus and clickmaps as pictures** (7.0) | q41eu-dev | `menu` and `clickmap`, drawn and matched by Dev; `screen.Menu`, `screen.Region`; the `menu` and `picture` examples; a file picker in Try it | kit unit tests, the app end to end with a fake robot, the site's tests, the browser test, devcheck |
 | H1–H5 | **Helpers, one per release:** H1 menu, H2 clickmap, H3 countdown, H4 sequence, H5 speak | q41eu-dev (kit packages `menu`, `assets`, `scene`, `voice`) | the kit package, Dev's action, library helpers, an example, a docs section | kit unit tests (rendering, hit tests, schedules with a fake clock), `TestExamples`, devcheck |
 | 10 | **Advanced apps** | q41eu-dev | the apps of 5.8 as examples, in every language they fit; the case studies updated with what the kit now has | `TestExamples` |
 | 11 | **`webapp` in the kit** | q41eu-dev | sessions, pairing, sign-in, the manager's reports, the page's event stream; Dev on it first | Dev's app tests unchanged and green |
@@ -763,7 +812,8 @@ Each step is a release that is useful on its own, in this order. Tests: `gofmt`,
 (4–5) come before many new actions, so none is added without its row; scopes (6) before the
 riskier features; the libraries and the runner (7–9) before the features (F) and helpers (H),
 so each one lands in every language in one release; the kit grows inside Dev (H, 11) before
-the apps move onto it (12–13); media last (14), behind the most rules.
+the apps move onto it (12–13); media last (14), behind the most rules. H0 comes early: the owner
+asked for menus and clickmaps, and their picture versions need none of 4–9.
 
 ## 11. Decisions for the owner
 

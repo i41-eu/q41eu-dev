@@ -443,6 +443,16 @@ func TestPagesInBrowser(t *testing.T) {
 	b.open(ts.URL + "/docs/examples")
 	b.eval(`localStorage.clear()`, nil)
 
+	// The case studies' excerpts are the apps' Go code, not a language choice: shown with Go off.
+	b.open(ts.URL + "/docs/case-studies/pet?lang=python")
+	if !b.is(`document.querySelectorAll("figure.excerpt").length > 5 && [...document.querySelectorAll("figure.excerpt")].every((f) => f.checkVisibility())`) {
+		t.Fatal("the case study's excerpts are hidden by the language choice")
+	}
+	if !b.is(`[...document.querySelectorAll("img")].every((i) => i.complete && i.naturalWidth > 0) || (document.querySelectorAll("img").forEach((i) => i.loading = "eager"), false)`) {
+		b.waitFor("the pictures", `[...document.querySelectorAll("img")].every((i) => i.complete && i.naturalWidth > 0)`)
+	}
+	b.noErrors("the case studies")
+
 	// Today's robot card still works: pairing by the QR code's link, Try it, a key, events, Run.
 	robot := connectRobot(t, ts.URL)
 	robot.waitFor("pair code", func() bool { return robot.code != "" })

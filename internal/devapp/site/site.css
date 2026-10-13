@@ -26,7 +26,7 @@ header.top .bar { max-width: 1100px; margin: 0 auto; padding: 0 16px; display: f
 nav.pages { display: flex; flex-wrap: wrap; gap: 0 14px; min-width: 0; }
 nav.pages a { color: var(--muted); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
 nav.pages a:hover { color: var(--text); }
-nav.pages a[aria-current=page] { color: var(--text); font-weight: 600; text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 2px; }
+nav.pages a[aria-current] { color: var(--text); font-weight: 600; text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 2px; }
 nav.pages a.brand { color: var(--text); font-weight: 700; }
 .acct { margin-left: auto; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 0.95rem; }
 .chips { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
@@ -75,6 +75,11 @@ table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 th { text-align: left; font-weight: 600; color: var(--muted); font-size: 0.8rem; padding: 4px 8px 4px 0; }
 td { padding: 5px 8px 5px 0; border-top: 1px solid var(--border); vertical-align: top; overflow-wrap: break-word; }
 td:first-child { white-space: nowrap; }
+table.prose { table-layout: fixed; } /* code may break anywhere: auto widths would squeeze a column */
+table.prose td:first-child { white-space: normal; }
+table.prose th:nth-child(1) { width: 42%; } table.prose th:nth-child(2) { width: 22%; }
+@media (max-width: 640px) { table.prose th:nth-child(1) { width: 36%; } table.prose th:nth-child(2) { width: 29%; } }
+th[scope=row] { white-space: nowrap; vertical-align: top; padding-top: 6px; }
 .tablewrap { overflow-x: auto; margin: 6px 0 4px; }
 dl.evs { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 4px 0 8px; }
 dl.evs dt, dl.evs dd { margin: 0; padding: 4px 0; border-top: 1px solid var(--border); min-width: 0; }
@@ -135,3 +140,19 @@ pre.out { background: var(--code); }
 .foot { color: var(--muted); font-size: 0.85rem; margin: 28px auto 8px; padding: 0 16px; line-height: 1.6; max-width: 1100px; }
 .foot p { max-width: 760px; }
 .foot a { color: inherit; }
+
+/* case studies: code excerpts of the apps, their pictures */
+.excerpt { margin: 10px 0; min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--code); }
+.excerpt figcaption { padding: 6px 10px 0; font-size: 0.85rem; }
+.excerpt figcaption code { background: none; padding: 0; }
+.excerpt pre { margin: 0; background: none; max-height: 520px; overflow: auto; }
+.shots { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-start; margin: 4px 0 10px; }
+.shot { margin: 0; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.shot img { display: block; max-width: 100%; height: auto; border-radius: 10px; }
+.shot figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 4px; max-width: 420px; }
+.apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; }
+.app { display: flex; gap: 12px; align-items: center; border: 1px solid var(--border); border-radius: 12px; padding: 10px; background: var(--bg); min-width: 0; }
+.app img { width: 96px; height: 96px; flex: none; }
+.app h3 { margin: 0 0 4px; }
+.app p { margin: 0 0 4px; }
+.lessons li { margin: 6px 0; }

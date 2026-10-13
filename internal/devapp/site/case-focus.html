@@ -1,0 +1,87 @@
+{{define "main"}}{{with app "focus"}}
+<h1>Focus, a case study</h1>
+<p class="sub">Focus is a focus timer for the robot, in the style of the Pomodoro Technique®: focus for 25 minutes, a 5 minute break, and a longer break after every four. The robot is the timer; a phone is optional. Its code: <a href="{{.URL}}">{{.Repo}}</a> at {{.Tag}} (Apache-2.0), online at <a href="https://focus.q41.eu">focus.q41.eu</a>. The Pomodoro Technique® is a registered trademark of Francesco Cirillo; Focus is not affiliated with it.</p>
+<nav class="toc" aria-label="On this page"><a href="#what-it-shows">What it shows</a><a href="#how-it-is-built">How it is built</a><a href="#uses">What it uses</a><a href="#code">The key code</a><a href="#lessons">What it teaches</a></nav>
+
+<section class="card">
+  <h2 id="what-it-shows">What the robot and the phone show</h2>
+  <div class="shots">
+    <figure class="shot"><img src="/site/img/focus-robot.png" width="280" height="280" loading="lazy" alt="A Stackchan robot running Focus with minutes and seconds shown: 17:42 left in a red ring, its LEDs counting down">
+      <figcaption>Focus on the robot, here with minutes and seconds shown (a setting). By default no number counts down: the ring empties in six calm steps.</figcaption></figure>
+  </div>
+  <ul class="links">
+    <li><b>The screen:</b> the phase (FOCUS, SHORT BREAK, LONG BREAK), the time left as a ring, today's count with the daily goal, the set's dots, and a line for the room: FOCUSING, STRETCH, TAKE A WALK, PAUSED, TAP TO FOCUS.</li>
+    <li><b>The LEDs:</b> both strips show the time left in the same six steps, dim: red while focusing, green or blue on a break, amber when paused, off when idle. A sign for others in the room.</li>
+    <li><b>Touch:</b> tap the screen, or touch the head, to start or pause; hold the screen to skip to the next phase.</li>
+    <li><b>The end of a phase:</b> a rising bell and a nod after focus; two calm notes and a look up after a break.</li>
+    <li><b>The phone or computer</b> (paired by the robot's QR code, or signed in through the manager; optional): the same timer with Start/Pause, Skip and Reset, what you focus on, marks for interruptions, today's focus periods, days in a row, the last seven days, and the settings.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2 id="how-it-is-built">How it is built</h2>
+  <p>About 2,200 lines of Go and a 390-line page, in four parts; of the kit it uses <code>robothub</code> for the robots' connections and <code>sound</code> for its three chimes.</p>
+  <div class="tablewrap"><table>
+  <caption class="sr-only">Focus's parts</caption>
+  <thead><tr><th scope="col">Part</th><th scope="col">What it does</th><th scope="col">Lines</th></tr></thead>
+  <tbody>
+  <tr><td><a href="{{.URL "internal/timer/timer.go"}}"><code>internal/timer</code></a></td><td>the timer's rules: phases, start, pause, skip, reset, the history and the statistics. Pure: the caller passes the time.</td><td>384</td></tr>
+  <tr><td><a href="{{.URL "internal/screen/screen.go"}}"><code>internal/screen</code></a></td><td>the robot's picture (the ring, and a 5×7 pixel font of its own) and the LEDs' colours</td><td>381</td></tr>
+  <tr><td><a href="{{.URL "internal/app/robot.go"}}"><code>internal/app</code></a></td><td>the robots through the kit's hub, the page's API and its event stream, pairing, sign-in through the manager, the browsers reported to it</td><td>1,214</td></tr>
+  <tr><td><a href="{{.URL "cmd/q41eu-focus/main.go"}}"><code>cmd/q41eu-focus</code></a></td><td>the flags, the state (a file or Postgres), the server</td><td>210</td></tr>
+  </tbody></table></div>
+  <p>The tests (730 lines): the timer's rules with times passed in, the pictures, and the app end to end, a fake robot over a real connection and a test clock.</p>
+</section>
+
+<section class="card">
+  <h2 id="uses">What it uses of the robot</h2>
+  <p>Every message Focus sends the robot or handles, and the same through Dev's API: a program can do what Focus shows on the robot with these actions.</p>
+  <div class="tablewrap"><table class="prose">
+  <caption class="sr-only">What Focus sends and handles, and Dev's actions for it</caption>
+  <thead><tr><th scope="col">The robot</th><th scope="col">For</th><th scope="col">Through Dev</th></tr></thead>
+  <tbody>
+  <tr><td>a picture (binary <code>0x10</code>, a 320×240 JPEG)</td><td>the timer</td><td><a href="/docs/api#show"><code>show</code></a> <code>image</code></td></tr>
+  <tr><td><code>leds</code> with 12 <code>pixels</code></td><td>the time left</td><td><a href="/docs/api#leds"><code>leds</code></a> <code>pixels</code> (or <code>bar</code>)</td></tr>
+  <tr><td>speaker sound (binary <code>0x03</code>): the chimes <code>start</code>, <code>done</code>, <code>break_over</code></td><td>a start, the end of a phase</td><td><a href="/docs/api#sound"><code>sound</code></a> <code>chime</code></td></tr>
+  <tr><td><code>nod</code>; <code>look</code> at yaw 0, pitch 30</td><td>the end of a phase</td><td><a href="/docs/api#move"><code>move</code></a> <code>gesture</code> nod; <code>yaw</code>, <code>pitch</code></td></tr>
+  <tr><td>the events <code>screen_tap</code> and <code>head_press</code></td><td>start or pause</td><td><a href="/docs/api#events"><code>events</code></a>: <a href="/docs/api#ev-tap"><code>tap</code></a>; for the head <a href="/docs/api#ev-pat"><code>pat</code></a> or <a href="/docs/api#ev-pet"><code>pet</code></a>, when the touch ends</td></tr>
+  <tr><td>the event <code>screen_long_press</code></td><td>skip</td><td><a href="/docs/api#ev-long_press"><code>long_press</code></a></td></tr>
+  </tbody></table></div>
+</section>
+
+<section class="card">
+  <h2 id="code">The key code</h2>
+  <h3 id="code-hub">The robots, through the kit's hub</h3>
+  <p>The hub checks the robots' tokens (the shared one, or one a manager gave the robot), keeps one connection per robot, makes the pairing codes for its QR screen and reports the paired browsers to the manager. Focus only says what to do when a robot connects, leaves or reports something; the timer is its own.</p>
+  {{template "excerpt" (excerpt "focus/hub")}}
+  <h3 id="code-paired">No browser needed</h3>
+  <p>A robot whose app has no paired browser shows its QR screen. The timer needs no browser, so the robot always hears of at least one, and shows the timer at once (the QR code stays a swipe away).</p>
+  {{template "excerpt" (excerpt "focus/paired")}}
+  <h3 id="code-touch">Touches: one action each</h3>
+  <p>The robot reports raw input: a touch on the screen, a press on the head. Focus starts or pauses on either, at most once in 1.5 s (<code>touchGap</code>), so one touch is one action however it is reported; a long press skips.</p>
+  {{template "excerpt" (excerpt "focus/touch")}}
+  <h3 id="code-show">Send only what changed</h3>
+  <p>The robot's picture is Focus's own drawing, sent as a JPEG. A key names each picture, and a new one goes to the robot only when the key changes: six times a phase when calm, every second only when the seconds are shown. The LEDs likewise.</p>
+  {{template "excerpt" (excerpt "focus/show")}}
+  <h3 id="code-react">The end of a phase</h3>
+  <p>The chimes are the kit's (<code>sound.Chime</code>), each short enough for one speaker message (the robot buffers about 3 s); the head nods or looks up, unless the person turned the moves off.</p>
+  {{template "excerpt" (excerpt "focus/react")}}
+  <h3 id="code-tick">The rules, pure</h3>
+  <p>The timer never reads a clock: the app's loop calls <code>Tick</code> with the time every 200 ms, and the tests call it with any time they like, so a whole set of focus periods and breaks runs in milliseconds.</p>
+  {{template "excerpt" (excerpt "focus/tick")}}
+</section>
+
+<section class="card">
+  <h2 id="lessons">What it teaches</h2>
+  <ul class="links lessons">
+    <li><b>Let the kit hold the robots.</b> Tokens, connections, pairing codes and the manager's reports are twenty lines of configuration (<code>newHub</code>); the app keeps its own state.</li>
+    <li><b>Keep the rules pure.</b> A model that takes the time from its caller is easy to test, and the robot, the page and the statistics all read the same timer.</li>
+    <li><b>The screen is a picture you draw.</b> Any Go image becomes the robot's screen; the kit's <code>screen</code> draws cards and questions the same way (Dev's <a href="/docs/api#show"><code>show</code></a>).</li>
+    <li><b>Send what changed, not every tick.</b> A key per picture and the last LEDs keep the robot's connection quiet and its screen calm.</li>
+    <li><b>Work without a phone.</b> Telling the robot it has a viewer puts the app on its screen from the start; the phone adds settings and statistics.</li>
+    <li><b>One action per touch.</b> A short gap turns a touch that is reported twice into one start or pause.</li>
+    <li><b>Test end to end.</b> A fake robot on a real connection and a test clock run the app as the robot would (<a href="{{.URL "internal/app/app_test.go"}}"><code>app_test.go</code></a>).</li>
+  </ul>
+  <p>Also in the kit for an app like it: <code>leds.Bar</code> and <code>leds.Dim</code> make a bar like Focus's own LEDs, <code>robot.Play</code> paces a sound of any length for the speaker, and <code>robot.Gesture</code> and <code>robot.Look</code> check that the robot offers the command first.</p>
+</section>
+{{end}}{{end}}

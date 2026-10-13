@@ -1,8 +1,8 @@
 # Dev's site and the dev package: design
 
-**Status:** design, 2026-10-12. Steps 1 and 2 of the plan (section 10: the pages, the language
-selector and the search) are built and described in [docs/site.md](../docs/site.md); their
-sections here keep only what is still to come. The rest is a plan (docs describe only what exists, so it lives in
+**Status:** design, 2026-10-12. Steps 1, 2 and 3 of the plan (section 10: the pages, the language
+selector, the search, and the case studies) are built and described in
+[docs/site.md](../docs/site.md); their sections here keep only what is still to come. The rest is a plan (docs describe only what exists, so it lives in
 `wip/`). Names of new actions, events and files are proposals.
 
 **The request** (the project's owner, 2026-10-12): a much better web site for dev.q41.eu.
@@ -71,7 +71,7 @@ streams); its answers and events are not passed on. Events are what a person did
 
 The Go kit for app authors: `robothub` (robot connections, tokens, pairing codes), `robot`
 (cards, pictures, say, face, look, gestures, LEDs, effects, volume, paced sound), `screen`,
-`sound`, `leds`, `gesture`. Focus and Pet already use `robothub` and `sound`.
+`sound`, `leds`, `gesture`. Focus and Pet already use `robothub` and `sound` (Pet `leds` too).
 
 ### 1.3 Clients per language today
 
@@ -281,7 +281,8 @@ links, the search box, the language chips, the account.
 
 Built (step 1, [docs/site.md](../docs/site.md)): `/`, `/robots`, `/docs/start`, `/docs/api`
 (the parts of today's actions, the events by sensor), `/docs/examples`, the header (with the
-search box, step 2). The other pages come with the steps that make them true.
+search box, step 2); and in step 3 `/docs/case-studies` with `/docs/case-studies/focus` and
+`/docs/case-studies/pet`. The other pages come with the steps that make them true.
 
 ### 5.3 The language selector
 
@@ -561,6 +562,13 @@ POST …/clickmap {"id": "map1", "image": "<base64>" or "file": "world.png",
 
 ## 8. Case studies
 
+Built (step 3, [docs/site.md](../docs/site.md)): a page per app as it is at a tag (Focus v0.5.0,
+Pet v0.14.1): what the robot and the phone show, its parts, what it sends and handles with the
+same through Dev's actions, its key code as excerpts linked to their lines at the tag, what it
+teaches; and an index with the two side by side and the kit's packages. The tables below are
+the plan for moving the apps onto the kit; each later step adds its piece to the pages when it
+lands (only what exists is on the site).
+
 ### 8.1 Focus (q41eu-focus)
 
 A focus timer: about 2,400 lines of Go and HTML without tests (520 of tests). Already on the
@@ -598,7 +606,7 @@ release each, its tests guarding); keep its timer and screen.
 ### 8.2 Pet (q41eu-pet)
 
 A Tamagotchi for kids: about 7,900 lines without tests (2,400 of tests, the app test alone
-1,300). On `robothub` and `sound`; everything else its own.
+1,300). On `robothub`, `sound` and `leds` (its LED colours, `leds.Correct`); everything else its own.
 
 | Pet today | With the dev package | Effect |
 |---|---|---|
@@ -729,7 +737,7 @@ Each step is a release that is useful on its own, in this order. Tests: `gofmt`,
 |---|---|---|---|---|
 | 1 | **Pages and the language selector** (built: [docs/site.md](../docs/site.md)) | q41eu-dev | the page split into Home, Your robots, Start, API, Examples; the header with the chips (curl, Python, JavaScript, Go, MCP), side by side or tabs, remembered; the four examples in all their languages; `/pair` to `/robots` | a test renders every page: every example in each of its languages, every internal link answers 200; the readme's table equals the action table; a look at phone width |
 | 2 | **Search** (built: [docs/site.md](../docs/site.md#search)) | q41eu-dev | `/docs/search.json` (actions, arguments, events, examples, pages, synonyms), the box in the header | a test: the index has every action, argument, event, example and page heading |
-| 3 | **Case studies, first version** | q41eu-dev | Focus and Pet as they are today: what `robothub` and `sound` do for them, mapped to their code; each later step adds its piece when it lands | links checked; reviewed against the apps' code |
+| 3 | **Case studies, first version** (built: [docs/site.md](../docs/site.md)) | q41eu-dev | Focus and Pet as they are today: what `robothub` and `sound` do for them, mapped to their code; each later step adds its piece when it lands | links checked; reviewed against the apps' code |
 | 4 | **The protocol catalog** | i41eu-arch (one line in the spec), q41eu-raw | `wire/catalog.go`; `fake-robot` from it; `screen_snapshot` and `speaker_flush` documented; the readme's Commands table checked | q41eu-raw tests: readme ↔ catalog, fake-robot ↔ catalog |
 | 4b | `camera_mic_off` declared in `Register` | i41eu-StackChan | one line in the readings list | a robot's `Register` (devcheck in step 5) |
 | 5 | **Coverage** | q41eu-dev | `coverage.go`, `TestCoverage`, `/docs/coverage`, `/v1/coverage`; readings and the API by part from the catalog; Dev and devcheck compare a robot's `Register` with the catalog | `TestCoverage`; devcheck on a real robot |

@@ -38,7 +38,7 @@
 <a class="skip" href="#main">Skip to the content</a>
 <header class="top">
   <div class="bar">
-    <nav class="pages" aria-label="Pages">{{range .Pages}}<a href="{{.Path}}"{{if eq .Path "/"}} class="brand"{{end}}{{if eq .Path $.Page.Path}} aria-current="page"{{end}}>{{.Nav}}</a>{{end}}</nav>
+    <nav class="pages" aria-label="Pages">{{range .Pages}}{{if .Nav}}<a href="{{.Path}}"{{if eq .Path "/"}} class="brand"{{end}}{{if eq .Path $.Page.Path}} aria-current="page"{{else if eq .Path $.Page.Parent}} aria-current="true"{{end}}>{{.Nav}}</a>{{end}}{{end}}</nav>
     <div class="search" role="search">
       <label for="q" class="sr-only">Search the docs</label>
       <input id="q" type="search" placeholder="Search the docs ( / )" autocomplete="off" spellcheck="false"
@@ -88,6 +88,12 @@
 <div class="row"><button type="button" class="run" data-run="{{.ID}}">Run</button><span class="muted runwho">it on your robot from this page</span></div>
 <pre class="out" aria-live="polite" hidden></pre>
 <div class="wide">{{template "code" .Blocks}}</div>{{end}}
+
+{{/* excerpt: a few lines of an app's code at its tag (cases.go), with a link to them */}}
+{{define "excerpt"}}<figure class="excerpt" data-excerpt="{{.Key}}">
+<figcaption><a href="{{.URL}}"><code>{{.Path}}</code>, lines {{.From}}–{{.To}}</a> <span class="muted">at {{.App.Tag}}</span></figcaption>
+<pre><code>{{.Code}}</code></pre>
+</figure>{{end}}
 
 {{/* action: one action of the API, its arguments and a call in every language */}}
 {{define "action"}}<article class="action">

@@ -61,7 +61,9 @@ Dev serves its own docs, built into the binary (a Dev at home has them offline):
 [docs/site.md](docs/site.md).
 
 - **Pages:** Home, Your robots, Getting started, the API by part (every action with a call in
-  each language, the events by sensor), Examples (every example in every language, with Run).
+  each language, the events by sensor), Examples (every example in every language, with Run),
+  Case studies (Focus and Pet, two apps on the Go kit: what they use, their key code, what they
+  teach).
 - **Languages:** chips at the top for curl, Python, JavaScript, Go and MCP (what to ask an AI
   agent): all on by default, several at once, remembered in the browser; every code block is
   shown in each language picked, side by side or in tabs. `?lang=python` in a link picks for one

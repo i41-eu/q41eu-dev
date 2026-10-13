@@ -7,7 +7,9 @@ package devapp
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -20,6 +22,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/i41-eu/q41eu-dev/examples"
 	"github.com/i41-eu/q41eu-dev/gesture"
@@ -33,15 +36,19 @@ type language struct{ ID, Name string }
 
 var languages = []language{{"curl", "curl"}, {"python", "Python"}, {"js", "JavaScript"}, {"go", "Go"}, {"mcp", "MCP"}}
 
-// sitePage is a page of the site, in the order of the header's links.
-type sitePage struct{ Path, Nav, Title, File string }
+// sitePage is a page of the site, in the order of the header's links. A page with a Parent has
+// no link of its own there: its parent's link is marked while it is open.
+type sitePage struct{ Path, Nav, Title, File, Parent string }
 
 var sitePages = []sitePage{
-	{"/", "Dev", "Stackchan Dev", "home.html"},
-	{"/robots", "Your robots", "Your robots", "robots.html"},
-	{"/docs/start", "Getting started", "Getting started", "start.html"},
-	{"/docs/api", "API", "The API by part", "api.html"},
-	{"/docs/examples", "Examples", "Examples", "examples.html"},
+	{"/", "Dev", "Stackchan Dev", "home.html", ""},
+	{"/robots", "Your robots", "Your robots", "robots.html", ""},
+	{"/docs/start", "Getting started", "Getting started", "start.html", ""},
+	{"/docs/api", "API", "The API by part", "api.html", ""},
+	{"/docs/examples", "Examples", "Examples", "examples.html", ""},
+	{"/docs/case-studies", "Case studies", "Case studies", "cases.html", ""},
+	{"/docs/case-studies/focus", "", "Focus, a case study", "case-focus.html", "/docs/case-studies"},
+	{"/docs/case-studies/pet", "", "Pet, a case study", "case-pet.html", "/docs/case-studies"},
 }
 
 // apiPart is a part of the robot on the API page, with the actions that use it. Every action is
@@ -133,13 +140,15 @@ type siteData struct {
 	Examples []exampleView
 	Calling  []codeBlock // the helpers the API's snippets use, per language
 	Start    []codeBlock // getting started: the first program, per language
+	Apps     []caseApp   // the case studies' apps
 }
 
 // site is the rendered site.
 type site struct {
-	pages  map[string][]byte // path -> the page
-	files  fs.FS             // its scripts
-	search []byte            // /docs/search.json
+	pages    map[string][]byte // path -> the page
+	files    fs.FS             // its scripts and pictures
+	search   []byte            // /docs/search.json
+	excerpts map[string]excerpt
 }
 
 // buildSite renders every page from the templates in files.
@@ -165,6 +174,11 @@ func buildSite(files fs.FS) (*site, error) {
 		return nil, err
 	}
 	d.Start = startBlocks(d.Examples)
+	d.Apps = caseApps
+	excerpts, err := loadExcerpts(files)
+	if err != nil {
+		return nil, err
+	}
 	funcs := template.FuncMap{
 		"join": strings.Join,
 		"part": func(id string) (partView, error) {
@@ -183,8 +197,23 @@ func buildSite(files fs.FS) (*site, error) {
 			}
 			return exampleView{}, fmt.Errorf("no example %q", id)
 		},
+		"excerpt": func(key string) (excerpt, error) {
+			e, ok := excerpts[key]
+			if !ok {
+				return excerpt{}, fmt.Errorf("no excerpt %q in cases/", key)
+			}
+			return e, nil
+		},
+		"app": func(id string) (caseApp, error) {
+			for _, c := range caseApps {
+				if c.ID == id {
+					return c, nil
+				}
+			}
+			return caseApp{}, fmt.Errorf("no case study app %q", id)
+		},
 	}
-	s := &site{pages: map[string][]byte{}, files: files}
+	s := &site{pages: map[string][]byte{}, files: files, excerpts: excerpts}
 	for _, p := range sitePages {
 		t, err := template.New(p.File).Funcs(funcs).ParseFS(files, "layout.html", p.File)
 		if err != nil {
@@ -710,6 +739,30 @@ func (a *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Write(s.search)
+}
+
+// sitePictures are the pictures under site/img/, by extension.
+var sitePictures = map[string]string{".png": "image/png", ".jpg": "image/jpeg"}
+
+// handleSitePicture serves a picture of the pages (site/img/).
+func (a *App) handleSitePicture(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("file")
+	kind, ok := sitePictures[path.Ext(name)]
+	s, err := a.siteNow()
+	if !ok || err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	b, err := fs.ReadFile(s.files, "img/"+name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	sum := sha256.Sum256(b)
+	w.Header().Set("Content-Type", kind)
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("ETag", `"`+hex.EncodeToString(sum[:8])+`"`)
+	http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(b))
 }
 
 // handleSiteFile serves the site's scripts.

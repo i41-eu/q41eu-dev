@@ -1,0 +1,135 @@
+== hub internal/app/robot.go 18-38
+// newHub: robots connect through the dev kit's hub (github.com/i41-eu/q41eu-dev/robothub), which
+// checks their tokens, keeps their connections and pairing codes; the timer is the app's.
+func (a *App) newHub() *robothub.Hub {
+	return robothub.New(robothub.Config{
+		Token: a.cfg.RobotToken, Manager: a.cfg.Manager, PublicURL: a.cfg.PublicURL, PairTTL: a.cfg.PairTTL, Log: a.log,
+		Connected:    a.attach,
+		Disconnected: a.detach,
+		Event:        func(c *robothub.Robot, ev wire.RobotEventBody) { a.robotEvent(c.ID(), ev) },
+		// The timer needs no browser: the robot always hears of one, so it shows the timer, not its QR screen.
+		Paired: func(id string) wire.PairedBody {
+			a.mu.Lock()
+			defer a.mu.Unlock()
+			return a.paired(id)
+		},
+		Owner: func(id, owner string) {
+			a.mu.Lock()
+			defer a.mu.Unlock()
+			a.setOwnerLocked(id, owner)
+		},
+	})
+}
+== touch internal/app/robot.go 61-83
+// robotEvent: a tap on the screen or a touch on the head starts or pauses; a long press on the
+// screen skips to the next phase.
+func (a *App) robotEvent(id string, ev wire.RobotEventBody) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	r := a.robots[id]
+	if r == nil {
+		return
+	}
+	now := a.cfg.Now()
+	r.lastSeen = now
+	switch ev.Name {
+	case "screen_tap", "head_press":
+		if now.Sub(r.lastTouch) < touchGap {
+			return
+		}
+		r.lastTouch = now
+		a.actLocked(r, "toggle", "", now)
+	case "screen_long_press":
+		r.lastTouch = now
+		a.actLocked(r, "skip", "", now)
+	}
+}
+== react internal/app/robot.go 124-149
+// reactLocked is the robot's answer to what happened: a sound, a nod, a look up. a.mu held.
+func (a *App) reactLocked(r *robot, ev timer.Event) {
+	c, s := r.conn, r.timer.Settings
+	if c == nil {
+		return
+	}
+	play := func(name string) {
+		if s.Sound && slices.Contains(r.commands, "speaker") {
+			c.Binary(wire.BinSpeakerPCM, sound.Message(sound.Chime(name)))
+		}
+	}
+	switch ev {
+	case timer.Started, timer.Resumed:
+		play("start")
+	case timer.Completed: // a break now: a bell and a nod
+		play("done")
+		if s.Moves {
+			c.Command("nod", nil)
+		}
+	case timer.BreakOver: // back to work: two notes, a look up at the person
+		play("break_over")
+		if s.Moves {
+			c.Command("look", map[string]any{"yaw": 0, "pitch": 30})
+		}
+	}
+}
+== show internal/app/robot.go 159-183
+// showLocked sends the robot its picture and LEDs when they changed: a picture every second
+// only with the seconds shown, once a minute with minutes, six times a phase when calm. a.mu held.
+func (a *App) showLocked(r *robot, now time.Time) {
+	c := r.conn
+	if c == nil {
+		return
+	}
+	v := a.screenView(r, now)
+	if key := screen.Key(v); key != r.shownFrame {
+		r.shownFrame = key
+		c.Binary(wire.BinShowJPEG, screen.Frame(v))
+	}
+	if !r.timer.Settings.Lights {
+		v.Status = "idle" // all off
+	}
+	leds := strings.Join(screen.LEDs(v), ",")
+	if leds != r.shownLEDs && slices.Contains(r.commands, "leds") {
+		r.shownLEDs = leds
+		px := []any{}
+		for _, c := range screen.LEDs(v) {
+			px = append(px, c)
+		}
+		c.Command("leds", map[string]any{"pixels": px})
+	}
+}
+== paired internal/app/app.go 148-164
+// paired is what the robot hears about browsers. The timer needs none, so the robot always
+// hears at least one: it shows the timer, not its QR screen (the QR stays a swipe away).
+// a.mu held.
+func (a *App) paired(robotID string) wire.PairedBody {
+	viewers, seen := 0, map[string]bool{}
+	for _, s := range a.sessions {
+		if slices.Contains(s.Robots, robotID) {
+			viewers++
+		}
+	}
+	for sub := range a.subs {
+		if s := a.sessions[sub.sid]; s != nil && slices.Contains(s.Robots, robotID) {
+			seen[sub.sid] = true
+		}
+	}
+	return wire.PairedBody{Viewers: max(1, viewers), Watching: len(seen), Reconnect: true}
+}
+== tick internal/timer/timer.go 227-243
+// Tick moves the timer on when a running phase is over. It returns what happened (one event at
+// most; call it again for the next).
+func (t *Timer) Tick(now time.Time) Event {
+	if t.Status != Running || now.Before(t.EndsAt) {
+		return ""
+	}
+	end := t.EndsAt
+	if t.Phase == Focus {
+		t.History = append(t.History, Done{At: end.UTC(), Minutes: t.Settings.FocusMin, Task: t.Task})
+		t.prune(now)
+		t.Round++
+		t.next(end, true)
+		return Completed
+	}
+	t.next(end, true)
+	return BreakOver
+}

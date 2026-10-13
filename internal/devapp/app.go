@@ -261,6 +261,7 @@ func (a *App) Handler() http.Handler {
 		mux.HandleFunc(pattern, page)
 	}
 	mux.HandleFunc("GET /site/{file}", a.handleSiteFile)
+	mux.HandleFunc("GET /site/img/{file}", a.handleSitePicture)
 	mux.HandleFunc("GET /docs/search.json", a.handleSearch)
 	mux.HandleFunc("GET /pair", a.handlePair)
 	mux.HandleFunc("GET /auth/login", a.handleLogin)

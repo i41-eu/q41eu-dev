@@ -13,8 +13,10 @@ offline, as dev.q41.eu. What comes next for it is planned in
 | `/docs/start` | Getting started | from a robot on the desk to a program driving it (as [getting-started.md](getting-started.md)), the first program's command in each language |
 | `/docs/api` | The API by part | calling an action (the helper per language, the answers and errors), then a section per part of the robot: screen and face, head, LEDs, speaker, questions, what people do (the events, by the sensor that notices them), state and readings, any robot command; each action with its arguments and one call in each language |
 | `/docs/examples` | Examples | every example in every language (the files themselves, with Copy and Download), the parts of the robot it uses, **Run** |
+| `/docs/case-studies` | Case studies | Focus and Pet side by side (what each is, its size, what it uses of the kit and of the robot), an app compared with a program, the kit's packages and who uses them |
+| `/docs/case-studies/focus`, `/docs/case-studies/pet` | Focus, Pet | one app each, as it is at a tag of its public repository: what the robot and the phone show (its pictures), how it is built (its parts and their lines), what it sends the robot and handles with the same through Dev's actions (or "an app only"), its key code (excerpts, each with a link to its lines at the tag), what it teaches |
 
-The header on every page: the page links, the search box, the account (Sign in or out through
+The header on every page: the page links (a case study marks Case studies), the search box, the account (Sign in or out through
 the manager, a link to the manager), the language chips. The robot's QR code (`/pair?code=…`) pairs the browser
 and goes to `/robots`.
 
@@ -84,6 +86,12 @@ own session, and shows what it prints: a JavaScript copy of the example's steps,
   [examples/examples.json](../examples/examples.json) (per example its title, what it shows, the
   parts it uses, and per language its file and the command that runs it). Which action belongs to
   which part of the robot is `apiParts` in `site.go`.
+- **Case studies:** the apps and the tags the pages describe are `caseApps` in `cases.go`; the code
+  excerpts are `site/cases/<app>.txt`, the lines as they are at the tag, each after a line
+  `== <key> <path> <from>-<to>` (a page shows one with `{{template "excerpt" (excerpt "pet/menu")}}`);
+  their pictures are `site/img/` (served at `/site/img/`, with their sources and licences in
+  `site/img/NOTICE`). A new tag of an app: its excerpts again from there, its numbers and tables
+  checked, then `TestCaseExcerpts` with `-cases-from`.
 - **Adding:** a page is a template and a line in `sitePages`; a new action needs its line in
   `apiParts` (a test fails until it has one); a new example is its files and its entry in
   `examples.json`.
@@ -99,10 +107,15 @@ own session, and shows what it prints: a JavaScript copy of the example's steps,
 - `TestSearchIndex`: the index has every action, argument, event, example, page and section,
   each once and pointing at an anchor that exists; every synonym leads to a word the site has.
 - `TestReadmeTable`: the readme's API table lists the actions, in order.
+- `TestCaseStudies`: every excerpt is shown once, on its app's page, with a link to its lines; every
+  link into an app's repository is at its tag, never a branch; the pictures are served (with an
+  ETag) and nothing else under `/site/img/`. An excerpt's line count must equal its range, or the
+  site does not build. `TestCaseExcerpts`, only with `-args -cases-from=<dir>` (clones of
+  q41eu-focus and q41eu-pet in `<dir>`), compares every excerpt with its lines at the tag.
 - `TestPagesInBrowser`, in a headless Chrome or Chromium when one is installed (`$CHROME`, or on
   `PATH`; skipped with `-short`): the language selector (all on by default; off by a click and by
   the keyboard; remembered, on another page too; the last one off turns all on; `?lang=` and
   Keep; tabs; storage blocked), the robot's card (paired by the QR code's link, Try it, a new key,
-  an event, Run), the search (`/` to the box, an action found by its name and an example by what
+  an event, Run), the case studies' code shown whatever the languages picked, the search (`/` to the box, an action found by its name and an example by what
   it does, the arrow keys, Enter, Escape, a synonym, nothing found), and no page, nor the search's
   results, wider than a 390 px phone.

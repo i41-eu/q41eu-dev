@@ -1,0 +1,63 @@
+{{define "main"}}
+<h1>Case studies</h1>
+<p class="sub">Two apps built on Dev's Go kit, as they are today: Focus, a focus timer, and Pet, a pet for kids. For each: what the robot and the phone show, how it is built, what it uses of the kit and of the robot, its key code with links to the exact lines, and what a developer learns from it.</p>
+
+<section class="card">
+  <h2 id="the-apps">Focus and Pet</h2>
+  <div class="apps">
+    {{with app "focus"}}<article class="app">
+      <img src="/site/img/focus-robot.png" width="400" height="400" alt="A Stackchan robot running Focus: the time left in a red ring, its LEDs counting down">
+      <div><h3><a href="/docs/case-studies/focus">Focus</a></h3>
+        <p>A focus timer: the robot shows the time left as a ring and on its LEDs, chimes and nods when a phase ends; a tap starts it. The basics of an app.</p>
+        <p class="muted"><a href="{{.URL}}">{{.Repo}}</a> at {{.Tag}} · <a href="https://focus.q41.eu">focus.q41.eu</a></p></div>
+    </article>{{end}}
+    {{with app "pet"}}<article class="app">
+      <img src="/site/img/pet-robot.png" width="400" height="400" alt="A Stackchan robot running the pet: a happy face, its LEDs warm">
+      <div><h3><a href="/docs/case-studies/pet">Pet</a></h3>
+        <p>A Tamagotchi for kids: the pet lives on a server, the robot is its body. Menus, food cards, games, a daily routine. The rest of the robot.</p>
+        <p class="muted"><a href="{{.URL}}">{{.Repo}}</a> at {{.Tag}} · <a href="https://pet.q41.eu">pet.q41.eu</a></p></div>
+    </article>{{end}}
+  </div>
+  <div class="tablewrap"><table>
+  <caption class="sr-only">Focus and Pet side by side</caption>
+  <thead><tr><th scope="col"></th><th scope="col">Focus</th><th scope="col">Pet</th></tr></thead>
+  <tbody>
+  <tr><th scope="row">Code</th><td>2,200 lines of Go and a 390-line page; 730 lines of tests</td><td>6,900 lines of Go and 930 of pages; 2,400 lines of tests</td></tr>
+  <tr><th scope="row">Of the kit</th><td><code>robothub</code>, <code>sound</code></td><td><code>robothub</code>, <code>sound</code>, <code>leds</code></td></tr>
+  <tr><th scope="row">Of the robot</th><td>pictures on the screen, the LEDs, the speaker, the head; touches on the screen and the head</td><td>all that, and stored pictures and sounds (sprites, the file store), the speech bubble and the face, stickers, brightness and the screen saver, NFC cards, the motion sensors, the light sensor at 20 a second, the camera</td></tr>
+  <tr><th scope="row">Read it for</th><td>the kit's hub, a pure model with its tests, drawing the screen, sending only what changed, touches</td><td>meaning from raw input, pictures kept on the robot, menus from tappable sprites, timed steps, streams, guarding the head, falling back</td></tr>
+  </tbody></table></div>
+</section>
+
+<section class="card">
+  <h2 id="app-or-program">An app or a program</h2>
+  <p>The rest of this site is about <b>programs</b>: a script, a page or an AI agent that uses the robot through Dev, with a key. Focus and Pet are <b>apps</b>: servers the robot connects to itself, as it connects to Dev. The robot runs one app at a time; its app switcher (the QR screen: Next, Connect) moves between them.</p>
+  <div class="tablewrap"><table>
+  <caption class="sr-only">A program and an app compared</caption>
+  <thead><tr><th scope="col"></th><th scope="col">A program, through Dev</th><th scope="col">An app, on the kit</th></tr></thead>
+  <tbody>
+  <tr><th scope="row">Talks to</th><td>Dev's API (HTTP <code>/v1</code>, MCP), with a key</td><td>the robot itself, over the device wire protocol (<code>robothub</code>)</td></tr>
+  <tr><th scope="row">Runs</th><td>when you start it</td><td>all the time, as a server</td></tr>
+  <tr><th scope="row">In</th><td>any language</td><td>Go (the kit)</td></tr>
+  <tr><th scope="row">Reaches</th><td><a href="/docs/api">Dev's actions and events</a></td><td>every command, event, reading and stream of the robot</td></tr>
+  <tr><th scope="row">Its own page</th><td>no: Dev's</td><td>yes, paired by the robot's QR code</td></tr>
+  </tbody></table></div>
+  <p>Each case study maps what the app does to Dev's actions, so a program can do the same where Dev's API reaches.</p>
+</section>
+
+<section class="card">
+  <h2 id="the-kit">The kit</h2>
+  <p>The Go packages every app needs (<a href="https://pkg.go.dev/github.com/i41-eu/q41eu-dev">pkg.go.dev</a>), and who uses them today. Dev is built on all of them.</p>
+  <div class="tablewrap"><table>
+  <caption class="sr-only">The kit's packages</caption>
+  <thead><tr><th scope="col">Package</th><th scope="col">What it does</th><th scope="col">Used by</th></tr></thead>
+  <tbody>
+  <tr><td><a href="https://github.com/i41-eu/q41eu-dev/blob/main/robothub/hub.go"><code>robothub</code></a></td><td>the robot side of an app: tokens (the shared one, or a manager's per robot), one connection per robot, pairing codes, pings; the app gets callbacks (connected, events, telemetry, binary streams) and sends commands; <code>Report</code> tells the manager the paired browsers</td><td>Focus, Pet, Dev</td></tr>
+  <tr><td><a href="https://github.com/i41-eu/q41eu-dev/blob/main/sound/sound.go"><code>sound</code></a></td><td>16 kHz sounds: tones, bells, glides, melodies, the named chimes (Focus's and Pet's among them), speaker messages, WAV files</td><td>Focus, Pet, Dev</td></tr>
+  <tr><td><a href="https://github.com/i41-eu/q41eu-dev/blob/main/leds/leds.go"><code>leds</code></a></td><td>the 12 LEDs in the robot's order: a bar, one colour, a screen colour corrected for the LEDs</td><td>Pet, Dev</td></tr>
+  <tr><td><a href="https://github.com/i41-eu/q41eu-dev/blob/main/robot/robot.go"><code>robot</code></a></td><td>higher-level calls on a connected robot: a card, a picture, say, a face, look, nod, LEDs, sounds paced for the speaker</td><td>Dev</td></tr>
+  <tr><td><a href="https://github.com/i41-eu/q41eu-dev/blob/main/screen/screen.go"><code>screen</code></a></td><td>320×240 pictures: a card with text that fits itself, a question with buttons and its hit test, the Go fonts</td><td>Dev</td></tr>
+  <tr><td><a href="https://github.com/i41-eu/q41eu-dev/blob/main/gesture/gesture.go"><code>gesture</code></a></td><td>the robot's raw input as what a person did: a tap, a pat, a pet, a stroke, picked up, a tag</td><td>Dev</td></tr>
+  </tbody></table></div>
+</section>
+{{end}}

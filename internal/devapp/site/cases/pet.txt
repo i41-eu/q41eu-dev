@@ -1,0 +1,181 @@
+== hub internal/app/robotconn.go 64-103
+// newHub: robots connect through the hub; the pet's state stays here.
+func (a *App) newHub() *robothub.Hub {
+	return robothub.New(robothub.Config{
+		Token: a.cfg.RobotToken, Manager: a.cfg.Manager, PublicURL: a.cfg.PublicURL, PairTTL: a.cfg.PairTTL, Log: a.log,
+		Connected: func(r *robothub.Robot) { a.attach(&robotConn{hubRobot: r, id: r.ID()}, r.Capabilities().Commands) },
+		Disconnected: func(r *robothub.Robot) {
+			a.mu.Lock()
+			c := a.robots[r.ID()]
+			a.mu.Unlock()
+			if c != nil && c.conn != nil && c.conn.hubRobot == hubRobot(r) {
+				a.detach(c.conn)
+			}
+		},
+		Event:     func(r *robothub.Robot, ev wire.RobotEventBody) { a.robotEvent(r.ID(), ev) },
+		Telemetry: func(r *robothub.Robot, m map[string]float64) { a.telemetry(r.ID(), m) },
+		Binary: func(r *robothub.Robot, kind byte, payload []byte) {
+			switch kind {
+			case wire.BinLight: // the game's hand detection
+				a.lightSamples(r.ID(), payload)
+			case wire.BinSnapshot: // a leaderboard photo, or a screen snapshot (photos.go)
+				a.robotSnapshot(r.ID(), payload)
+			case wire.BinAudioMulti: // a debug recording (debug.go)
+				a.micAudio(r.ID(), payload)
+			}
+		},
+		// Browsers paired before: the robot starts with its face, not the QR screen.
+		Paired: func(id string) wire.PairedBody {
+			a.mu.Lock()
+			defer a.mu.Unlock()
+			return a.paired(id)
+		},
+		Owner: func(id, owner string) {
+			a.mu.Lock()
+			defer a.mu.Unlock()
+			if rb := a.robots[id]; owner == "" || rb == nil || rb.owner != owner {
+				a.setOwnerLocked(id, owner)
+			}
+		},
+	})
+}
+== held internal/app/robotconn.go 53-59
+// command queues a robot command.
+func (c *robotConn) command(name string, args map[string]any) bool {
+	if headCommands[name] && c.held.Load() {
+		return false // the head stays still in a kid's hands
+	}
+	return c.count(c.Command(name, args))
+}
+== menu internal/app/menu.go 91-103
+	for _, m := range menus[name] {
+		a.sprite(r, map[string]any{"id": "m:" + m.action, "asset": assetDir + m.asset, "x": m.x, "y": m.y, "z": 21, "tap": true})
+	}
+	id := r.menuID
+	time.AfterFunc(menuTimeout, func() {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if r.menu != "" && r.menuID == id && r.conn != nil {
+			a.closeMenu(r)
+			a.express(r, a.now())
+		}
+	})
+}
+== menutap internal/app/engine.go 427-432
+	case "screen_tap":
+		if r.menu != "" {
+			sprite, _ := ev.Data["sprite"].(string)
+			a.menuTap(r, sprite, now)
+			return
+		}
+== assets internal/app/assets.go 59-90
+	want := petAssets()
+	for name, b := range want {
+		if have[name] == crc32.ChecksumIEEE(b) {
+			r.files[name] = true
+		}
+	}
+	for name := range have { // the pet's old files (e.g. a picture it no longer uses)
+		if _, ok := want[name]; !ok && strings.HasPrefix(name, assetDir) {
+			r.conn.command("asset_delete", map[string]any{"name": name})
+			a.log.Info("deleting an old pet file on the robot", "robot", r.id, "name", name)
+		}
+	}
+	names := make([]string, 0, len(want))
+	for name, b := range want {
+		if crc, ok := have[name]; !ok || crc != crc32.ChecksumIEEE(b) {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		a.log.Info("robot files up to date", "robot", r.id, "files", len(want))
+		a.refreshFace(r)
+		return
+	}
+	r.uploading = map[string]uint32{}
+	var chunks [][]byte
+	for _, name := range names {
+		r.uploading[name] = crc32.ChecksumIEEE(want[name])
+		chunks = append(chunks, wire.AssetChunks(name, want[name])...)
+	}
+	a.log.Info("uploading pet files", "robot", r.id, "files", len(names), "chunks", len(chunks))
+	go a.sendChunks(r.conn, chunks)
+== later internal/app/engine.go 97-114
+// later runs fn after d unless another reaction started meanwhile (or the robot left).
+func (a *App) later(r *robot, d time.Duration, fn func()) {
+	gen := r.gen
+	time.AfterFunc(d, func() {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if r.gen == gen && r.conn != nil {
+			fn()
+		}
+	})
+}
+
+// begin starts a reaction: the mood waits until it is over.
+func (a *App) begin(r *robot, now time.Time, d time.Duration) {
+	r.gen++
+	r.busyUntil = now.Add(d)
+	a.later(r, d, func() { a.express(r, a.now()) })
+}
+== eat internal/app/engine.go 760-778
+// eatSprite: the food drops in from the top and glides to the mouth over the face,
+// then shrinks bite by bite (munch, nod) and the pet says what it ate.
+func (a *App) eatSprite(r *robot, asset, line string) {
+	c := r.conn
+	a.emotion(r, "happy")
+	a.drawnFace(r, "yum")
+	a.sprite(r, map[string]any{"id": "food", "asset": asset, "x": 160, "y": -60, "scale": 0.8, "z": 1})
+	a.sprite(r, map[string]any{"id": "food", "x": 160, "y": 170, "ms": 700})
+	a.later(r, 750*time.Millisecond, func() {
+		a.play(r, "munch", false)
+		c.command("nod", nil)
+		a.sprite(r, map[string]any{"id": "food", "scale": 0.55})
+	})
+	a.later(r, 1150*time.Millisecond, func() { a.sprite(r, map[string]any{"id": "food", "scale": 0.3}) })
+	a.later(r, 1500*time.Millisecond, func() {
+		c.command("sprite_hide", map[string]any{"id": "food"})
+		a.sayText(r, line, 3)
+	})
+}
+== hand internal/app/game.go 259-284
+// handNear reads one light sample: true when a hand seems close. The baselines
+// follow the room: proximity drops at once and rises slowly, light follows
+// while no hand is near.
+func (g *game) handNear(ps, ch0 float64) bool {
+	g.sawLight = true
+	g.samples++
+	if g.samples == 1 {
+		g.psMin, g.psMax, g.ch0Min, g.ch0Max = ps, ps, ch0, ch0
+	}
+	g.psMin, g.psMax = min(g.psMin, ps), max(g.psMax, ps)
+	g.ch0Min, g.ch0Max = min(g.ch0Min, ch0), max(g.ch0Max, ch0)
+	if g.psBase < 0 {
+		g.psBase, g.ch0Base = ps, ch0
+		return false
+	}
+	near := ps >= g.psBase+proxRise || (g.ch0Base >= shadowMin && ch0 < g.ch0Base*shadowPart)
+	if ps < g.psBase {
+		g.psBase = ps
+	} else if !near {
+		g.psBase += (ps - g.psBase) * 0.02
+	}
+	if !near {
+		g.ch0Base += (ch0 - g.ch0Base) * 0.05
+	}
+	return near
+}
+== fallback internal/app/game.go 168-178
+	if ball := assetDir + "ball.png"; r.canSprite(ball) {
+		// The ball glides over the face to its next spot (the center of a quarter).
+		x, y := 80+160*(spot%2), 60+120*(spot/2)
+		if g.round == 1 {
+			a.sprite(r, map[string]any{"id": "ball", "asset": ball, "x": x, "y": y, "scale": 0.6, "z": 1})
+		} else {
+			a.sprite(r, map[string]any{"id": "ball", "x": x, "y": y, "ms": 300})
+		}
+	} else {
+		a.showPicture(r, robotpic.Ball(spot))
+	}

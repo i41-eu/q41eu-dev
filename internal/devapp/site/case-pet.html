@@ -1,0 +1,107 @@
+{{define "main"}}{{with app "pet"}}
+<h1>Pet, a case study</h1>
+<p class="sub">Pet is a Tamagotchi for kids: the pet lives on a server, the robot is its body. Kids play with the robot itself and with a picture page on a phone or tablet; parents set the daily routine on a page of their own. Its code: <a href="{{.URL}}">{{.Repo}}</a> at {{.Tag}} (MIT), online at <a href="https://pet.q41.eu">pet.q41.eu</a>.</p>
+<nav class="toc" aria-label="On this page"><a href="#what-it-shows">What it shows</a><a href="#how-it-is-built">How it is built</a><a href="#uses">What it uses</a><a href="#code">The key code</a><a href="#lessons">What it teaches</a></nav>
+
+<section class="card">
+  <h2 id="what-it-shows">What the robot and the phone show</h2>
+  <div class="shots">
+    <figure class="shot"><img src="/site/img/pet-robot.png" width="240" height="240" loading="lazy" alt="A Stackchan robot running the pet: a happy face, its LEDs warm">
+      <figcaption>The pet on the robot: a happy face, the LEDs warm.</figcaption></figure>
+    <figure class="shot"><img src="/site/img/pet-faces.jpg" width="420" height="159" loading="lazy" alt="The pet's seven faces on the robot's screen: happy, yum, fine, yawning, asleep, hungry, bored">
+      <figcaption>Its faces, one per mood, made from Fluent Emoji to fill the robot's screen (a parent can switch back to the robot's own face).</figcaption></figure>
+  </div>
+  <ul class="links">
+    <li><b>The face and the LEDs</b> follow the pet's mood, from three needs (food, fun, energy) that drop while it is awake; the LEDs glow dim in the mood's colour, and a hungry pet breathes orange.</li>
+    <li><b>Touch the head:</b> a tickle, a cuddle, a long cuddle or scratching, each with its own line and sound. <b>Hold an NFC food card</b> to it: the food glides into the mouth and goes bite by bite. <b>Shake it:</b> "Wheee!". <b>Come close:</b> it says hello now and then.</li>
+    <li><b>Tap the screen:</b> a menu of picture tiles over the face (food, play, nap, needs) with a back arrow.</li>
+    <li><b>Games:</b> catch the ball (five balls in the screen's quarters; the head circles, wanders, then dodges a hand the light sensor sees coming); the color game (the LED strips show colours, the kid presses them in order on the screen; the three best get a photo from the robot's camera on a podium).</li>
+    <li><b>The day:</b> a lullaby and a warm night light that fades at bedtime, a greeting and a tune in the morning, rest during school hours. It speaks its lines, with a speech bubble.</li>
+    <li><b>The phone:</b> the kid's page works with pictures, no reading needed: the pet's face, three need bars, four big buttons. The parent's page (signed in as the robot's owner, or a PIN at home) has the routine, the food cards, the games and a log. Both are in <a href="{{.URL "readme.md"}}">its readme</a>, with pictures.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2 id="how-it-is-built">How it is built</h2>
+  <p>About 6,900 lines of Go and 930 of pages. Of the kit it uses <code>robothub</code> for the robots' connections, <code>sound</code> for its sounds (the pet's chimes moved into the kit), and <code>leds</code> for its LED colours.</p>
+  <div class="tablewrap"><table>
+  <caption class="sr-only">Pet's parts</caption>
+  <thead><tr><th scope="col">Part</th><th scope="col">What it does</th><th scope="col">Lines</th></tr></thead>
+  <tbody>
+  <tr><td><a href="{{.URL "internal/pet/pet.go"}}"><code>internal/pet</code></a></td><td>the model: the needs, the daily schedule, moods, the kid's actions. No I/O: the caller passes the time and turns reactions into robot commands.</td><td>847</td></tr>
+  <tr><td><a href="{{.URL "internal/app/engine.go"}}"><code>internal/app</code></a></td><td>the robots through the hub; the engine (robot events to pet actions, moods to the face, speech, LEDs and sounds), the menus, the games, the files on the robot, the head guard, the watchdog; the pages and their API</td><td>4,764 and the pages</td></tr>
+  <tr><td><a href="{{.URL "internal/robotpic/robotpic.go"}}"><code>internal/robotpic</code></a></td><td>pictures for the robot's screen (the needs, menu tiles, game buttons, the podium) and the LED colours</td><td>710</td></tr>
+  <tr><td><a href="{{.URL "internal/voice/voice.go"}}"><code>internal/voice</code></a></td><td>the spoken lines: made once and kept</td><td>353</td></tr>
+  <tr><td><a href="{{.URL "cmd/q41eu-pet/main.go"}}"><code>cmd/q41eu-pet</code></a></td><td>the flags, the state (a file or Postgres), the server</td><td>269</td></tr>
+  </tbody></table></div>
+  <p>The tests (2,400 lines): the model with times passed in, and the app end to end (1,300 lines) with a fake robot and a settable clock: pairing, food cards, bedtime and the morning, the games, the sprites, the head after a game.</p>
+</section>
+
+<section class="card">
+  <h2 id="uses">What it uses of the robot</h2>
+  <p>What the pet sends the robot and handles, and how far Dev's API reaches it today: a program can do the first half of this table, and an app is needed for the rest.</p>
+  <div class="tablewrap"><table class="prose">
+  <caption class="sr-only">What the pet sends and handles, and Dev's actions for it</caption>
+  <thead><tr><th scope="col">The robot</th><th scope="col">For</th><th scope="col">Through Dev</th></tr></thead>
+  <tbody>
+  <tr><td><code>emotion</code>, <code>face</code></td><td>the robot's own face</td><td><a href="/docs/api#face"><code>face</code></a> <code>emotion</code>; <a href="/docs/api#show"><code>show</code></a> <code>clear</code></td></tr>
+  <tr><td><code>say</code></td><td>the speech bubble</td><td><a href="/docs/api#say"><code>say</code></a></td></tr>
+  <tr><td><code>leds</code>: sides, <code>pixels</code>, effects (breathe, blink, rainbow)</td><td>moods, the night light, the color game</td><td><a href="/docs/api#leds"><code>leds</code></a></td></tr>
+  <tr><td><code>nod</code>, <code>shake</code>, <code>look</code></td><td>reactions, the games</td><td><a href="/docs/api#move"><code>move</code></a></td></tr>
+  <tr><td>speaker sound (binary <code>0x03</code>), <code>volume</code></td><td>chimes, its voice</td><td><a href="/docs/api#sound"><code>sound</code></a> (the kit's chimes, and <code>volume</code>)</td></tr>
+  <tr><td>a picture (binary <code>0x10</code>)</td><td>the needs, the podium, a robot without sprites</td><td><a href="/docs/api#show"><code>show</code></a> <code>image</code></td></tr>
+  <tr><td><code>sticker</code>, <code>brightness</code>, <code>screensaver</code></td><td>hearts, the night, the games' fixed brightness</td><td><a href="/docs/api#command"><code>command</code></a></td></tr>
+  <tr><td>the events <code>screen_tap</code> (with the sprite hit), <code>screen_long_press</code>, <code>head_release</code>, <code>head_swipe_*</code>, <code>nfc_tag</code>, <code>shake</code>, <code>proximity_near</code></td><td>everything the kid does</td><td><a href="/docs/api#events"><code>events</code></a>: <code>tap</code> (with <code>sprite</code>), <code>long_press</code>, <code>pat</code>, <code>pet</code>, <code>stroke</code>, <code>tag</code>, <code>shaken</code>, <code>near</code></td></tr>
+  <tr><td>readings: <code>imu_a*_g</code>, <code>imu_gyro_dps</code>, <code>head_yaw_deg</code>, <code>head_pitch_deg</code></td><td>held in someone's hands, a sunken head</td><td><a href="/docs/api#state"><code>state</code></a> (every 2 s)</td></tr>
+  <tr><td><code>sprite</code>, <code>sprite_hide</code>; the event <code>sprite_error</code></td><td>menu tiles, the food, the ball, stars, the drawn faces</td><td>an app only: a program cannot store a picture on the robot</td></tr>
+  <tr><td>the file store: binary <code>0x11</code>, <code>assets</code>, <code>asset_delete</code>, <code>play</code>; the events <code>assets</code>, <code>asset_saved</code>, <code>sound_done</code></td><td>its pictures and sounds kept on the robot</td><td>an app only</td></tr>
+  <tr><td>the event <code>head_press</code> with its three zones</td><td>how hard: one finger dreams, the palm wakes it</td><td>an app only</td></tr>
+  <tr><td><code>light_stream</code> (binary <code>0x08</code>, 20 a second)</td><td>a hand coming close, in the game</td><td>an app only: Dev turns no stream on</td></tr>
+  <tr><td><code>snapshot</code> (binary <code>0x07</code>)</td><td>the podium's photos</td><td>an app only</td></tr>
+  <tr><td>the events <code>screensaver_on</code>, <code>screensaver_off</code></td><td>the screen's state</td><td>an app only</td></tr>
+  </tbody></table></div>
+</section>
+
+<section class="card">
+  <h2 id="code">The key code</h2>
+  <h3 id="code-hub">The robots, through the kit's hub</h3>
+  <p>As in Focus, plus two callbacks: the robot's readings every two seconds (the head's angles, motion) and its binary streams (the light sensor, a camera photo). The pet wraps the hub's robot in its own type (<code>robotConn</code>) for its rules and its counters.</p>
+  {{template "excerpt" (excerpt "pet/hub")}}
+  <h3 id="code-held">The head stays still in a kid's hands</h3>
+  <p>From the motion readings the pet learns the robot's rest pose, and calls it held when it tilts away from it, turns or is shaken (<a href="{{.URL "internal/app/held.go"}}"><code>held.go</code></a>). While held, every head command is dropped, in one place: the robot's connection.</p>
+  {{template "excerpt" (excerpt "pet/held")}}
+  <h3 id="code-files">Its pictures and sounds, kept on the robot</h3>
+  <p>At connect the pet asks for the robot's file list, keeps what is there with the right checksum (CRC-32), deletes its old files and uploads the rest in chunks, paced behind the commands. Later it shows a picture by its name: a few bytes instead of a JPEG.</p>
+  {{template "excerpt" (excerpt "pet/assets")}}
+  <h3 id="code-menu">A menu from tappable sprites</h3>
+  <p>Each tile is a stored picture shown as a sprite marked <code>tap</code>; the robot's tap event names the sprite it hit, so the pet needs no hit test. The menu closes by itself after 15 s.</p>
+  {{template "excerpt" (excerpt "pet/menu")}}
+  {{template "excerpt" (excerpt "pet/menutap")}}
+  <h3 id="code-later">Timed steps that a newer reaction cancels</h3>
+  <p>Reactions are short scenes: steps at times. Each reaction bumps a counter; a step whose counter is old is dropped, so a quick second touch never mixes two scenes.</p>
+  {{template "excerpt" (excerpt "pet/later")}}
+  <h3 id="code-eat">A scene: the food glides into the mouth</h3>
+  <p>A sprite drops in from above the screen, glides down in 700 ms (the robot animates it), and shrinks bite by bite with a munch and a nod.</p>
+  {{template "excerpt" (excerpt "pet/eat")}}
+  <h3 id="code-hand">A hand seen by the light sensor</h3>
+  <p>During catch the ball the robot streams its light and proximity sensor 20 times a second. A hand coming close raises the proximity or darkens the light; the baselines follow the room. The stream is on only during a game.</p>
+  {{template "excerpt" (excerpt "pet/hand")}}
+  <h3 id="code-fallback">And without sprites</h3>
+  <p>A robot without the ball's picture, or an older firmware, gets the same game as whole pictures.</p>
+  {{template "excerpt" (excerpt "pet/fallback")}}
+</section>
+
+<section class="card">
+  <h2 id="lessons">What it teaches</h2>
+  <ul class="links lessons">
+    <li><b>Make meaning from raw input.</b> The robot reports presses with their zones, releases with their length, swipes and tags; the pet decides what was a tickle, a cuddle or scratching, and waits half a second so a food card wins over the hand that brought it. Dev's <code>gesture</code> package does the general part (a pat, a pet, a stroke) for every program.</li>
+    <li><b>Guard the body.</b> A robot in a kid's hands must not twist its head: one check where commands leave the app covers every reaction and game.</li>
+    <li><b>Keep pictures on the robot.</b> Upload once, by checksum; show by name. Sprites move, fade and scale on the robot itself, and a tappable sprite is a button.</li>
+    <li><b>Give timed steps a generation.</b> A counter cancels the rest of a scene when a newer one starts; no timers to track down.</li>
+    <li><b>Turn streams on only while needed.</b> The light stream runs during a game; at connect the pet turns it off, in case a game was cut short.</li>
+    <li><b>Fall back.</b> Without sprites, whole pictures; without the light stream, the head dodges on a timer; without a stored sound, the sound itself.</li>
+    <li><b>Repair what got lost.</b> A command can be dropped (a full queue) or undone (the robot blanks its screen after a minute without commands); a watchdog notices and shows the pet's face again.</li>
+    <li><b>A pure model, an app test with a fake robot.</b> The needs and the schedule are tested with times passed in; the app test drives a fake robot and a settable clock through the games, bedtime and the morning.</li>
+  </ul>
+</section>
+{{end}}{{end}}

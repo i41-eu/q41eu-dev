@@ -82,7 +82,8 @@ own session, and shows what it prints: a JavaScript copy of the example's steps,
 - **One source:** the pages are made from the same data as the API: the actions
   (`internal/devapp/actions.go`: their help and arguments, and per action an `Example` call and a
   `Prompt` for an agent, from which the API page's call in every language is made), the events
-  (`gesture.Names`, grouped by the sensor in `site.go`), and the examples' manifest
+  (`gesture.Names`, what people did, and Dev's own `connected`, in `devEvents`; grouped by the
+  sensor in `site.go`), and the examples' manifest
   [examples/examples.json](../examples/examples.json) (per example its title, what it shows, the
   parts it uses, and per language its file and the command that runs it). Which action belongs to
   which part of the robot is `apiParts` in `site.go`.
@@ -93,8 +94,9 @@ own session, and shows what it prints: a JavaScript copy of the example's steps,
   `site/img/NOTICE`). A new tag of an app: its excerpts again from there, its numbers and tables
   checked, then `TestCaseExcerpts` with `-cases-from`.
 - **Adding:** a page is a template and a line in `sitePages`; a new action needs its line in
-  `apiParts` (a test fails until it has one); a new example is its files and its entry in
-  `examples.json`.
+  `apiParts`, help for it and each argument, and its row in the readme's API table naming every
+  argument; a new event its line in `eventGroups` and its name in the readme's events (tests fail
+  until they are there); a new example is its files and its entry in `examples.json`.
 
 ## Tests
 
@@ -102,6 +104,11 @@ own session, and shows what it prints: a JavaScript copy of the example's steps,
   every action, argument and event is on the API page, each action in exactly one part; every
   internal link answers and its anchor exists; no id twice on a page; the pages from disk equal
   the built-in ones.
+- `TestAPIDocs`: everything `GET /v1/actions` lists is documented. Each action: its section on
+  the API page with its help, a call in every language, a row per argument with its type, help and
+  choices; in the search (the action and each argument); in OpenAPI; as an MCP tool with every
+  argument; in the readme's API table with every argument. Each event: on the API page with what
+  it means, in the search, in the readme's The API, and (a person's) in the help of `events`.
 - `TestSnippets`: each action's example passes the API's own argument check, and so does each
   tool call in the MCP examples.
 - `TestSearchIndex`: the index has every action, argument, event, example, page and section,

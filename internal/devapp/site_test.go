@@ -346,3 +346,131 @@ func TestSearchIndex(t *testing.T) {
 		}
 	}
 }
+
+// Everything GET /v1/actions lists is documented: each action with its help, its arguments (each
+// with its help and choices) and a call in every language on the API page, in the search, in
+// OpenAPI and MCP, and in the readme's table; each event with what it means on the API page, in
+// the search and in the readme. A new action or event without its docs fails here.
+func TestAPIDocs(t *testing.T) {
+	a := New(Config{Log: slog.New(slog.NewTextHandler(io.Discard, nil)), PublicURL: "https://dev.example", Version: "test"})
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+	var list struct {
+		Actions []struct {
+			Name, Help string
+			Params     []struct {
+				Name, Type, Help string
+				Enum             []string
+			}
+		}
+		Events []string
+	}
+	_, raw := get(t, ts.URL+"/v1/actions")
+	if err := json.Unmarshal([]byte(raw), &list); err != nil || len(list.Actions) == 0 || len(list.Events) == 0 {
+		t.Fatalf("/v1/actions: %v %s", err, raw)
+	}
+	_, api := get(t, ts.URL+"/docs/api")
+	_, idxRaw := get(t, ts.URL+"/docs/search.json")
+	var idx struct{ Entries []searchEntry }
+	json.Unmarshal([]byte(idxRaw), &idx)
+	found := map[string]searchEntry{}
+	for _, e := range idx.Entries {
+		found[e.URL] = e
+	}
+	paths := a.openAPI()["paths"].(map[string]any)
+	tools, _ := a.mcpCall(nil, access{}, rpcRequest{Method: "tools/list"})
+	toolSchemas := map[string]map[string]any{}
+	for _, tool := range tools.(map[string]any)["tools"].([]map[string]any) {
+		toolSchemas[tool["name"].(string)] = tool["inputSchema"].(map[string]any)["properties"].(map[string]any)
+	}
+	readme, err := os.ReadFile("../../readme.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	apiSection := string(readme)[strings.Index(string(readme), "## The API"):]
+	apiSection = apiSection[:strings.Index(apiSection, "\n## ")]
+
+	article := func(name string) string {
+		return regexp.MustCompile(`(?s)<article class="action">\s*<h3 id="` + regexp.QuoteMeta(name) + `">.*?</article>`).FindString(api)
+	}
+	for _, act := range list.Actions {
+		art := article(act.Name)
+		switch {
+		case art == "":
+			t.Errorf("%s: no section on the API page", act.Name)
+			continue
+		case len(act.Help) < 20 || !strings.Contains(html.UnescapeString(art), act.Help):
+			t.Errorf("%s: its help %q is not on the API page", act.Name, act.Help)
+		}
+		for _, l := range languages {
+			block := regexp.MustCompile(`(?s)<figure class="code" data-lang="` + l.ID + `">.*?</figure>`).FindString(art)
+			if block == "" || strings.Contains(block, `class="missing`) || !strings.Contains(block, act.Name) {
+				t.Errorf("%s: no call in %s on the API page", act.Name, l.Name)
+			}
+		}
+		if e := found["/docs/api#"+act.Name]; e.Kind != "Actions" || e.Text == "" {
+			t.Errorf("%s: not in the search", act.Name)
+		}
+		p := "/v1/robots/{robot}/" + act.Name
+		if act.Name == "state" {
+			p = "/v1/robots/{robot}"
+		}
+		if paths[p] == nil {
+			t.Errorf("%s: not in OpenAPI", act.Name)
+		}
+		schema, isTool := toolSchemas["robot_"+act.Name]
+		if !isTool || len(schema) != len(act.Params) {
+			t.Errorf("%s: MCP's tool robot_%s has %d arguments, want %d", act.Name, act.Name, len(schema), len(act.Params))
+		}
+		row := regexp.MustCompile("(?m)^\\| `" + regexp.QuoteMeta(act.Name) + "` \\|.*$").FindString(apiSection)
+		if row == "" {
+			t.Errorf("%s: not in the readme's API table", act.Name)
+		}
+		for _, prm := range act.Params {
+			tr := regexp.MustCompile(`(?s)<tr id="` + regexp.QuoteMeta(act.Name+"-"+prm.Name) + `">.*?</tr>`).FindString(art)
+			plain := html.UnescapeString(tr)
+			if tr == "" || len(prm.Help) < 3 || !strings.Contains(plain, prm.Help) || !strings.Contains(plain, prm.Type) {
+				t.Errorf("%s %s: no row with its type and help %q on the API page", act.Name, prm.Name, prm.Help)
+			}
+			for _, choice := range prm.Enum {
+				if !strings.Contains(plain, choice) {
+					t.Errorf("%s %s: its choice %q is not on the API page", act.Name, prm.Name, choice)
+				}
+			}
+			if e := found["/docs/api#"+act.Name+"-"+prm.Name]; e.Kind != "Arguments" || e.In != act.Name {
+				t.Errorf("%s %s: not in the search", act.Name, prm.Name)
+			}
+			if _, ok := schema[prm.Name]; !ok {
+				t.Errorf("%s %s: not in MCP's tool", act.Name, prm.Name)
+			}
+			if !strings.Contains(row, "`"+prm.Name+"`") {
+				t.Errorf("%s %s: not in the readme's API table: %s", act.Name, prm.Name, row)
+			}
+		}
+	}
+	var eventsHelp string
+	for _, act := range list.Actions {
+		if act.Name == "events" {
+			eventsHelp = act.Help
+		}
+	}
+	for _, name := range list.Events {
+		means := regexp.MustCompile(`(?s)<dt id="ev-` + regexp.QuoteMeta(name) + `"><code>[^<]*</code></dt><dd>([^<]+)</dd>`).FindStringSubmatch(api)
+		if means == nil || len(strings.TrimSpace(means[1])) < 5 {
+			t.Errorf("event %s: not on the API page with what it means", name)
+		}
+		if e := found["/docs/api#ev-"+name]; e.Kind != "Events" || e.In == "" || e.Text == "" {
+			t.Errorf("event %s: not in the search", name)
+		}
+		if !strings.Contains(apiSection, "`"+name+"`") {
+			t.Errorf("event %s: not in the readme's The API", name)
+		}
+		if slices.ContainsFunc(gesture.Names, func(n struct{ Name, Means string }) bool { return n.Name == name }) &&
+			!regexp.MustCompile(`\b`+name+`\b`).MatchString(eventsHelp) {
+			t.Errorf("event %s: not in the events action's help", name)
+		}
+	}
+	if !slices.Contains(list.Events, "connected") {
+		t.Error("/v1/actions does not list connected")
+	}
+}

@@ -404,6 +404,11 @@ var Catalog = struct{ Commands []Command; Events []Event; Readings []Reading; Bi
 
 ### 6.3 Every action in every language
 
+Built (with step 3): `TestAPIDocs` ([docs/site.md](../docs/site.md#tests)) checks that everything
+`GET /v1/actions` lists is documented: each action, argument and event on the API page (with its
+help, choices and a call in every language), in the search, in OpenAPI, MCP and the readme; Dev's
+own event `connected` is listed with the others. What follows is still to come.
+
 - The generator of section 3.2 writes the libraries; `TestGenerated` checks that the
   committed files are what the generator makes now (a new action without regenerating
   fails).

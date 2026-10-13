@@ -460,10 +460,20 @@ func (in args) check(params []Param) error {
 	return nil
 }
 
-// eventNames for the docs.
+// devEvents are the events Dev adds to what people did (gesture.Names).
+var devEvents = []struct{ Name, Means string }{
+	{"connected", "the robot connected to Dev: at its start, after a restart, or back after it was away"},
+}
+
+// allEvents are every event a program gets, with what it means: what people did, then Dev's own.
+func allEvents() []struct{ Name, Means string } {
+	return append(slices.Clone(gesture.Names), devEvents...)
+}
+
+// eventNames for the docs (GET /v1/actions).
 func eventNames() []string {
 	var out []string
-	for _, n := range gesture.Names {
+	for _, n := range allEvents() {
 		out = append(out, n.Name)
 	}
 	return out

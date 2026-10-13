@@ -48,8 +48,7 @@
   <h3 id="event-list">The events</h3>
   {{range $.Events}}<h4 id="{{.ID}}">{{.Name}}</h4>
   <dl class="evs">{{range .Events}}<dt id="ev-{{.Name}}"><code>{{.Name}}</code></dt><dd>{{.Means}}</dd>{{end}}</dl>
-  {{end}}<p>Plus <code>connected</code>: the robot connected to Dev (also after a restart).</p>
-</section>{{end}}
+  {{end}}</section>{{end}}
 
 {{with part "readings"}}<section class="card part">
   <h2 id="{{.ID}}">{{.Name}}</h2>

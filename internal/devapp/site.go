@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/i41-eu/q41eu-dev/examples"
-	"github.com/i41-eu/q41eu-dev/gesture"
 )
 
 //go:embed site
@@ -83,6 +82,7 @@ var eventGroups = []eventGroup{
 	{"nfc", "NFC", []string{"tag", "tag_removed"}},
 	{"infrared", "Infrared", []string{"remote"}},
 	{"power", "Power", []string{"button", "plugged", "unplugged"}},
+	{"connection", "The connection", []string{"connected"}},
 }
 
 // codeBlock is one language's code in a group of code blocks.
@@ -269,12 +269,13 @@ func eventViews() ([]eventGroupView, error) {
 	var out []eventGroupView
 	for _, g := range eventGroups {
 		v := eventGroupView{ID: g.ID, Name: g.Name}
+		events := allEvents()
 		for _, name := range g.Events {
-			i := slices.IndexFunc(gesture.Names, func(n struct{ Name, Means string }) bool { return n.Name == name })
+			i := slices.IndexFunc(events, func(n struct{ Name, Means string }) bool { return n.Name == name })
 			if i < 0 {
 				return nil, fmt.Errorf("events %s: no event %q", g.ID, name)
 			}
-			v.Events = append(v.Events, eventView{Name: name, Means: gesture.Names[i].Means})
+			v.Events = append(v.Events, eventView{Name: name, Means: events[i].Means})
 		}
 		out = append(out, v)
 	}

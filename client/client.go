@@ -190,6 +190,51 @@ func (c *Client) Ask(ctx context.Context, question string, answers ...string) (s
 	return out.Answer, err
 }
 
+// MenuItem is a tile of a menu: a label, and a picture above it (a JPEG or PNG, nil: none); the
+// answer names the tile by its ID, else by its label.
+type MenuItem struct {
+	ID    string `json:"id,omitempty"`
+	Label string `json:"label,omitempty"`
+	Image []byte `json:"image,omitempty"` // sent as base64
+}
+
+// Menu shows 2-6 tiles under a title and waits (up to 30 s) for a tap on one; it gives the tile's
+// ID (else its label), or "" when nobody chose.
+func (c *Client) Menu(ctx context.Context, title string, items ...MenuItem) (string, error) {
+	var out struct {
+		Item string `json:"item"`
+	}
+	err := c.Do(ctx, "menu", map[string]any{"title": title, "items": items}, &out)
+	return out.Item, err
+}
+
+// Region is a place to tap on the screen (320x240 pixels): a rectangle, a circle or a polygon.
+type Region struct {
+	ID      string   `json:"id"`
+	Rect    []int    `json:"rect,omitempty"`    // x, y, w, h
+	Circle  []int    `json:"circle,omitempty"`  // x, y, r
+	Polygon [][2]int `json:"polygon,omitempty"` // 3 points or more
+}
+
+// Tap is where a person tapped in a clickmap: its region's ID ("" when nobody did) and the point.
+type Tap struct {
+	Region string `json:"region"`
+	X      int    `json:"x"`
+	Y      int    `json:"y"`
+}
+
+// Clickmap shows picture (a JPEG or PNG; nil: what the screen shows now stays) and waits (up to
+// 30 s) for a tap inside one of the regions; the screen stays as it is.
+func (c *Client) Clickmap(ctx context.Context, picture []byte, regions ...Region) (Tap, error) {
+	args := map[string]any{"regions": regions}
+	if picture != nil {
+		args["image"] = picture // []byte is base64 in JSON
+	}
+	var out Tap
+	err := c.Do(ctx, "clickmap", args, &out)
+	return out, err
+}
+
 // Event is something a person did at the robot: tap, long_press, pat, pet, stroke, shaken,
 // picked_up, near, away, tag, tag_removed, remote, button, plugged, unplugged (and connected).
 type Event struct {

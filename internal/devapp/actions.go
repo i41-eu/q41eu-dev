@@ -2,13 +2,15 @@ package devapp
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"image"
-	_ "image/jpeg" // decode pictures sent to "show"
+	_ "image/jpeg" // decode pictures sent to show, menu and clickmap
 	_ "image/png"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -24,7 +26,8 @@ import (
 // Param is one argument of an action (for checking, the docs and MCP's input schemas).
 type Param struct {
 	Name     string   `json:"name"`
-	Type     string   `json:"type"` // string, number, boolean, array (of strings), object
+	Type     string   `json:"type"`            // string, number, boolean, array, object
+	Items    string   `json:"items,omitempty"` // an array's items: string (when empty), object, or "string or object"
 	Help     string   `json:"help"`
 	Required bool     `json:"required,omitempty"`
 	Enum     []string `json:"enum,omitempty"`
@@ -72,13 +75,9 @@ func init() {
 					return nil, robot.Clear(r)
 				}
 				if s := in.str("image"); s != "" {
-					b, err := base64.StdEncoding.DecodeString(s)
+					img, err := decodePicture("image", s)
 					if err != nil {
-						return nil, fmt.Errorf("image: not base64: %w", err)
-					}
-					img, _, err := image.Decode(bytes.NewReader(b))
-					if err != nil {
-						return nil, fmt.Errorf("image: %w", err)
+						return nil, err
 					}
 					return nil, robot.Show(r, img)
 				}
@@ -200,6 +199,20 @@ func init() {
 				{Name: "answers", Type: "array", Required: true, Help: "2-4 short answers"},
 				{Name: "timeout_s", Type: "number", Help: "how long to wait (default 30, at most 120)"}},
 			run: runAsk},
+		{Name: "menu", Example: `{"title": "Snack?", "items": ["Apple", "Cake", "Carrot", "Milk"]}`,
+			Prompt: "Ask me on the robot which snack I want: apple, cake, carrot or milk.",
+			Help:   "A menu on the robot's screen: 2-6 tiles with labels, or pictures and labels, under a title; returns the tile the person taps, or timed_out.",
+			Params: []Param{{Name: "title", Type: "string", Help: "small text at the top"},
+				{Name: "items", Type: "array", Items: "string or object", Required: true, Help: "2-6 tiles: each a label (\"Apple\"), or {\"id\", \"label\", \"image\"} with a picture (JPEG or PNG, base64) above its label; the answer's item is the id, else the label"},
+				{Name: "timeout_s", Type: "number", Help: "how long to wait (default 30, at most 120)"}},
+			run: runMenu},
+		{Name: "clickmap", Example: `{"regions": [{"id": "left", "rect": [0, 0, 160, 240]}, {"id": "right", "rect": [160, 0, 160, 240]}]}`,
+			Prompt: "Wait until I tap the left or the right half of the robot's screen, and tell me which.",
+			Help:   "Places to tap on the screen, over a picture or over what it shows: returns the first tap inside one (its id, x and y), or timed_out. The screen stays as it is.",
+			Params: []Param{{Name: "image", Type: "string", Help: "a JPEG or PNG, base64, shown first (fitted to 320x240); without it the regions lie over what the screen shows now"},
+				{Name: "regions", Type: "array", Items: "object", Required: true, Help: "1-32 places in the screen's pixels (320x240): {\"id\", \"rect\": [x, y, w, h]}, {\"id\", \"circle\": [x, y, r]} or {\"id\", \"polygon\": [[x, y], ...]} (3-32 points); where they overlap, the first listed counts"},
+				{Name: "timeout_s", Type: "number", Help: "how long to wait (default 30, at most 120)"}},
+			run: runClickmap},
 		{Name: "events", Offline: true, Example: `{"after": 0, "seconds": 30}`,
 			Prompt: "Wait up to 30 s for someone to touch the robot, and tell me what they did.",
 			Help:   "What people did at the robot (tap, long_press, pat, pet, stroke, shaken, picked_up, near, away, tag, tag_removed, remote, button, plugged, unplugged), after a sequence number; waits up to seconds for the next one.",
@@ -313,10 +326,6 @@ func runAsk(ctx context.Context, a *App, id string, r *robothub.Robot, in args) 
 	if len(answers) < 2 || len(answers) > 4 || in.str("question") == "" {
 		return nil, errors.New("a question and 2-4 answers")
 	}
-	timeout, _ := in.num("timeout_s")
-	if timeout <= 0 {
-		timeout = 30
-	}
 	img, buttons := screen.Ask(in.str("question"), answers, leds.Names["blue"])
 	if err := robot.Show(r, img); err != nil {
 		return nil, err
@@ -324,13 +333,209 @@ func runAsk(ctx context.Context, a *App, id string, r *robothub.Robot, in args) 
 	if r.Has("speaker") {
 		robot.Play(ctx, r, sound.Chime("ask"))
 	}
-	q := &question{buttons: buttons, answer: make(chan int, 1)}
+	timeout, _ := in.num("timeout_s")
+	t, err := a.waitTap(ctx, id, r, func(x, y int) int { return screen.Hit(buttons, x, y) }, timeout)
+	switch {
+	case err != nil:
+		return nil, awayErr(r, err)
+	case t.i == tapReplaced:
+		return map[string]any{"answer": "", "replaced": true}, nil
+	case t.i == tapTimedOut:
+		robot.Clear(r)
+		return map[string]any{"answer": "", "timed_out": true}, nil
+	}
+	a.chosen(ctx, id, r, answers[t.i])
+	return map[string]any{"answer": answers[t.i], "index": t.i}, nil
+}
+
+// runMenu shows the tiles, waits for a tap on one, then takes the menu away.
+func runMenu(ctx context.Context, a *App, id string, r *robothub.Robot, in args) (any, error) {
+	list, _ := in["items"].([]any)
+	if len(list) < 2 || len(list) > screen.MaxMenuItems {
+		return nil, fmt.Errorf("items: 2-%d tiles, each a label or {id, label, image}", screen.MaxMenuItems)
+	}
+	var ids []string
+	var tiles []screen.MenuItem
+	for i, v := range list {
+		var tile screen.MenuItem
+		itemID := ""
+		switch it := v.(type) {
+		case string:
+			tile.Label = strings.TrimSpace(it)
+		case map[string]any:
+			for k := range it {
+				if k != "id" && k != "label" && k != "image" {
+					return nil, fmt.Errorf("items %d: unknown %q (id, label, image)", i, k)
+				}
+			}
+			label, okL := it["label"].(string)
+			itemID, _ = it["id"].(string)
+			tile.Label = strings.TrimSpace(label)
+			if s, isStr := it["image"].(string); isStr && s != "" {
+				img, err := decodePicture(fmt.Sprintf("items %d: image", i), s)
+				if err != nil {
+					return nil, err
+				}
+				tile.Image = img
+			}
+			if (!okL && it["label"] != nil) || (it["id"] != nil && itemID == "") {
+				return nil, fmt.Errorf("items %d: id and label are text", i)
+			}
+		default:
+			return nil, fmt.Errorf("items %d: a label or {id, label, image}", i)
+		}
+		if tile.Label == "" && tile.Image == nil {
+			return nil, fmt.Errorf("items %d: a label or a picture", i)
+		}
+		if itemID == "" {
+			itemID = tile.Label
+		}
+		ids, tiles = append(ids, itemID), append(tiles, tile)
+	}
+	img, buttons := screen.Menu(in.str("title"), tiles, leds.Names["blue"])
+	if err := robot.Show(r, img); err != nil {
+		return nil, err
+	}
+	if r.Has("speaker") {
+		robot.Play(ctx, r, sound.Chime("ask"))
+	}
+	timeout, _ := in.num("timeout_s")
+	t, err := a.waitTap(ctx, id, r, func(x, y int) int { return screen.Hit(buttons, x, y) }, timeout)
+	switch {
+	case err != nil:
+		return nil, awayErr(r, err)
+	case t.i == tapReplaced:
+		return map[string]any{"item": "", "replaced": true}, nil
+	case t.i == tapTimedOut:
+		robot.Clear(r)
+		return map[string]any{"item": "", "timed_out": true}, nil
+	}
+	a.chosen(ctx, id, r, cmp.Or(tiles[t.i].Label, ids[t.i]))
+	return map[string]any{"item": ids[t.i], "index": t.i, "label": tiles[t.i].Label}, nil
+}
+
+// runClickmap shows the picture (if any) and waits for a tap inside one of the regions; the
+// screen stays as it is.
+func runClickmap(ctx context.Context, a *App, id string, r *robothub.Robot, in args) (any, error) {
+	regions, err := parseRegions(in["regions"])
+	if err != nil {
+		return nil, err
+	}
+	if s := in.str("image"); s != "" {
+		img, err := decodePicture("image", s)
+		if err != nil {
+			return nil, err
+		}
+		if err := robot.Show(r, img); err != nil {
+			return nil, err
+		}
+	}
+	timeout, _ := in.num("timeout_s")
+	t, err := a.waitTap(ctx, id, r, func(x, y int) int { return screen.HitRegion(regions, x, y) }, timeout)
+	switch {
+	case err != nil:
+		return nil, err
+	case t.i == tapReplaced:
+		return map[string]any{"region": "", "replaced": true}, nil
+	case t.i == tapTimedOut:
+		return map[string]any{"region": "", "timed_out": true}, nil
+	}
+	return map[string]any{"region": regions[t.i].ID, "index": t.i, "x": t.x, "y": t.y}, nil
+}
+
+// MaxRegions is how many places a clickmap has at most; a polygon has at most as many points.
+const MaxRegions = 32
+
+// parseRegions reads a clickmap's regions: each an id and one shape, in the screen's pixels.
+func parseRegions(v any) ([]screen.Region, error) {
+	list, _ := v.([]any)
+	if len(list) < 1 || len(list) > MaxRegions {
+		return nil, fmt.Errorf("regions: 1-%d, each {id, rect: [x, y, w, h]}, {id, circle: [x, y, r]} or {id, polygon: [[x, y], ...]}", MaxRegions)
+	}
+	nums := func(v any, n int) ([]int, bool) {
+		l, ok := v.([]any)
+		if !ok || len(l) != n {
+			return nil, false
+		}
+		out := make([]int, n)
+		for i, x := range l {
+			f, isNum := x.(float64)
+			if !isNum {
+				return nil, false
+			}
+			out[i] = int(math.Round(f))
+		}
+		return out, true
+	}
+	var out []screen.Region
+	seen := map[string]bool{}
+	for i, item := range list {
+		m, ok := item.(map[string]any)
+		id, _ := m["id"].(string)
+		if !ok || id == "" || seen[id] {
+			return nil, fmt.Errorf("regions %d: an object with an id of its own", i)
+		}
+		seen[id] = true
+		g, shapes := screen.Region{ID: id}, 0
+		for k, v := range m {
+			switch k {
+			case "id":
+			case "rect":
+				n, ok := nums(v, 4)
+				if !ok || n[2] <= 0 || n[3] <= 0 {
+					return nil, fmt.Errorf("regions %s: rect is [x, y, w, h], w and h above 0", id)
+				}
+				g.Rect, shapes = image.Rect(n[0], n[1], n[0]+n[2], n[1]+n[3]), shapes+1
+			case "circle":
+				n, ok := nums(v, 3)
+				if !ok || n[2] <= 0 {
+					return nil, fmt.Errorf("regions %s: circle is [x, y, r], r above 0", id)
+				}
+				g.Center, g.R, shapes = image.Pt(n[0], n[1]), n[2], shapes+1
+			case "polygon":
+				l, _ := v.([]any)
+				if len(l) < 3 || len(l) > MaxRegions {
+					return nil, fmt.Errorf("regions %s: polygon is 3-%d points [x, y]", id, MaxRegions)
+				}
+				for _, p := range l {
+					n, ok := nums(p, 2)
+					if !ok {
+						return nil, fmt.Errorf("regions %s: polygon is 3-%d points [x, y]", id, MaxRegions)
+					}
+					g.Polygon = append(g.Polygon, image.Pt(n[0], n[1]))
+				}
+				shapes++
+			default:
+				return nil, fmt.Errorf("regions %s: unknown %q (id, and rect, circle or polygon)", id, k)
+			}
+		}
+		if shapes != 1 {
+			return nil, fmt.Errorf("regions %s: one shape: rect, circle or polygon", id)
+		}
+		out = append(out, g)
+	}
+	return out, nil
+}
+
+// What waitTap answers instead of a place.
+const (
+	tapReplaced = -1 // a newer ask, menu or clickmap took the screen
+	tapTimedOut = -2
+)
+
+// waitTap makes hit the robot's question (an older one answers replaced) and waits for a tap on
+// one of its places, up to timeout seconds (default 30, at most 120).
+func (a *App) waitTap(ctx context.Context, id string, r *robothub.Robot, hit func(x, y int) int, timeout float64) (tapped, error) {
+	if timeout <= 0 {
+		timeout = 30
+	}
+	q := &question{hit: hit, answer: make(chan tapped, 1)}
 	a.mu.Lock()
 	rs := a.stateFor(id)
 	if old := rs.ask; old != nil {
 		select {
-		case old.answer <- -1: // a newer question ends it
-		default:
+		case old.answer <- tapped{i: tapReplaced}:
+		default: // it has its answer already
 		}
 	}
 	rs.ask = q
@@ -343,25 +548,67 @@ func runAsk(ctx context.Context, a *App, id string, r *robothub.Robot, in args) 
 		a.mu.Unlock()
 	}()
 	select {
-	case i := <-q.answer:
-		if i < 0 {
-			return map[string]any{"answer": "", "replaced": true}, nil
-		}
-		robot.ShowCard(r, screen.Card{Text: answers[i], Color: leds.Names["green"], Note: "✓"})
-		if r.Has("speaker") {
-			robot.Play(ctx, r, sound.Chime("yes"))
-		}
-		time.AfterFunc(1200*time.Millisecond, func() { robot.Clear(r) })
-		return map[string]any{"answer": answers[i], "index": i}, nil
+	case t := <-q.answer:
+		return t, nil
 	case <-time.After(time.Duration(min(120, timeout) * float64(time.Second))):
-		robot.Clear(r)
-		return map[string]any{"answer": "", "timed_out": true}, nil
+		return tapped{i: tapTimedOut}, nil
 	case <-ctx.Done():
-		robot.Clear(r)
-		return nil, ctx.Err()
+		return tapped{}, ctx.Err()
 	case <-r.Done():
-		return nil, robot.ErrGone
+		return tapped{}, robot.ErrGone
 	}
+}
+
+// awayErr ends an ask or a menu whose call went away (not the robot): the face again.
+func awayErr(r *robothub.Robot, err error) error {
+	if !errors.Is(err, robot.ErrGone) {
+		robot.Clear(r)
+	}
+	return err
+}
+
+// chosen confirms a choice on the robot: a green card with it and a tick, a chime, then the face
+// (unless another action came meanwhile: the program's next card stays).
+func (a *App) chosen(ctx context.Context, id string, r *robothub.Robot, label string) {
+	robot.ShowCard(r, screen.Card{Text: label, Color: leds.Names["green"], Note: "✓"})
+	if r.Has("speaker") {
+		robot.Play(ctx, r, sound.Chime("yes"))
+	}
+	a.mu.Lock()
+	acts := a.stateFor(id).acts
+	a.mu.Unlock()
+	time.AfterFunc(1200*time.Millisecond, func() {
+		a.mu.Lock()
+		still := a.stateFor(id).acts == acts
+		a.mu.Unlock()
+		if still {
+			robot.Clear(r)
+		}
+	})
+}
+
+// maxPicturePixels: a picture sent bigger than this is refused before it is decoded (a small
+// file can unpack into a huge picture).
+const maxPicturePixels = 4096 * 4096
+
+// decodePicture reads a JPEG or PNG sent as base64 (what names the argument in errors).
+func decodePicture(what, s string) (image.Image, error) {
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return nil, fmt.Errorf("%s: not base64: %w", what, err)
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(b))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", what, err)
+	}
+	if cfg.Width*cfg.Height > maxPicturePixels {
+		return nil, fmt.Errorf("%s: %dx%d is too big (at most 16 megapixels; 320x240 is shown)", what, cfg.Width, cfg.Height)
+	}
+	img, _, err := image.Decode(bytes.NewReader(b))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", what, err)
+	}
+	return img, nil
 }
 
 // run runs an action for someone allowed to use the robot.
@@ -393,6 +640,9 @@ func (a *App) run(ctx context.Context, acc access, id, name string, in args) (an
 		by = "key " + acc.key.Name
 	}
 	if name != "state" && name != "events" {
+		a.mu.Lock()
+		a.stateFor(id).acts++
+		a.mu.Unlock()
 		a.publish("action", map[string]any{"robot": id, "action": name, "args": in, "by": by, "at": time.Now()})
 	}
 	return act.run(ctx, a, id, r, in)

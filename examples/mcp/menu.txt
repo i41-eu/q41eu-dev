@@ -1,0 +1,12 @@
+menu: a snack menu of four tiles on the robot's screen; the tile tapped comes back.
+
+Ask your agent (Dev added as an MCP server: getting started, step 5):
+
+  Ask me on the robot which snack I want: apple, cake, carrot or milk. Then say it in a bubble.
+
+The tool calls it makes, and the answer when you tap Carrot:
+
+robot_menu {"title": "Snack?", "items": ["Apple", "Cake", "Carrot", "Milk"]}
+  -> {"item": "Carrot", "index": 2, "label": "Carrot"}
+robot_show {"clear": true}
+robot_say {"text": "Carrot, yum!"}

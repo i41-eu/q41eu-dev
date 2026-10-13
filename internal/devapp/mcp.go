@@ -16,7 +16,7 @@ var mcpVersions = []string{"2025-06-18", "2025-03-26", "2024-11-05"}
 
 const mcpInstructions = `You have a body: a Stackchan robot on someone's desk (a small screen face, a head that turns and nods, 12 LEDs, a speaker, a touch screen, a touch-sensitive head, sensors). ` +
 	`Use robot_show to put text on its screen, robot_say for a speech bubble on its face, robot_move to nod or look, robot_leds and robot_sound to signal, ` +
-	`robot_ask to ask the person at the robot a question they answer with a tap, robot_events to see what people did (taps, pats, a tag held near it), robot_state for its readings. ` +
+	`robot_ask to ask the person at the robot a question they answer with a tap (robot_menu for up to six choices, robot_clickmap for places on a picture), robot_events to see what people did (taps, pats, a tag held near it), robot_state for its readings. ` +
 	`Keep text on its screen short. Be calm: it sits next to a person who may be working.`
 
 type rpcRequest struct {
@@ -150,7 +150,13 @@ func schema(params []Param) map[string]any {
 	required := []string{}
 	for _, p := range params {
 		s := map[string]any{"type": p.Type, "description": p.Help}
-		if p.Type == "array" {
+		switch {
+		case p.Type != "array":
+		case p.Items == "object":
+			s["items"] = map[string]any{"type": "object"}
+		case p.Items == "string or object":
+			s["items"] = map[string]any{"anyOf": []any{map[string]any{"type": "string"}, map[string]any{"type": "object"}}}
+		default:
 			s["items"] = map[string]any{"type": "string"}
 		}
 		if len(p.Enum) > 0 {

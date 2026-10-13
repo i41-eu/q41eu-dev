@@ -29,6 +29,21 @@
     const notes = el("input", { type: "text", value: "C5:120 E5:120 G5:300", ariaLabel: "Notes to play" });
     const chime = el("select", { ariaLabel: "Chime" }, []);
     const question = el("input", { type: "text", value: "Coffee or tea?", ariaLabel: "Question" });
+    const tiles = el("input", { type: "text", value: "Tea, Coffee, Juice, Water", ariaLabel: "Menu items, separated by commas" });
+    const picture = el("input", { type: "file", accept: "image/*", ariaLabel: "A picture to show on the robot" });
+    // A picture from this phone or computer: made 320x240 here, so only that reaches the robot
+    // (nothing else of the photo, such as where it was taken).
+    const showPicture = async () => {
+      const f = picture.files[0];
+      if (!f) { out.textContent = "✗ pick a picture first"; return; }
+      try {
+        const bmp = await createImageBitmap(f);
+        const cv = el("canvas", { width: 320, height: 240 });
+        const k = Math.max(320 / bmp.width, 240 / bmp.height), w = bmp.width * k, h = bmp.height * k;
+        cv.getContext("2d").drawImage(bmp, (320 - w) / 2, (240 - h) / 2, w, h);
+        await run("show", { image: cv.toDataURL("image/jpeg", 0.9).split(",")[1] }, "show picture");
+      } catch (e) { out.textContent = "✗ that picture: " + e.message; }
+    };
     const answers = el("input", { type: "text", value: "Coffee, Tea", ariaLabel: "Answers, separated by commas" });
     const tryit = el("div", { className: "box" }, [
       el("h2", { textContent: "Try it" }),
@@ -46,6 +61,9 @@
       el("div", { className: "row" }, [notes, el("button", { className: "soft", textContent: "Play", onclick: () => run("sound", { notes: notes.value }, "notes") })]),
       el("div", { className: "row" }, [question, answers, el("button", { textContent: "Ask", onclick: () => run("ask", { question: question.value,
         answers: answers.value.split(",").map((s) => s.trim()).filter(Boolean), timeout_s: 30 }, "ask (tap an answer on the robot)") })]),
+      el("div", { className: "row" }, [tiles, el("button", { textContent: "Menu", onclick: () => run("menu", {
+        items: tiles.value.split(",").map((s) => s.trim()).filter(Boolean), timeout_s: 30 }, "menu (tap a tile on the robot)") })]),
+      el("div", { className: "row" }, [picture, el("button", { textContent: "Show picture", title: "Made 320x240 in this browser first: nothing else of the photo leaves it", onclick: showPicture })]),
       out,
     ]);
     c.fillChimes = () => { if (!chime.options.length) for (const n of info.chimes || []) chime.append(el("option", { value: n, textContent: n })); };

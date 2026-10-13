@@ -1,0 +1,12 @@
+picture: a picture on the robot's screen, then the quarter the person taps comes back.
+
+Ask your agent (Dev added as an MCP server: getting started, step 5); it reads the picture itself
+and sends it as base64:
+
+  Show examples/img/quarters.png on the robot, ask me to tap one of its quarters, and tell me which.
+
+The tool call it makes (the picture's base64 cut short here), and the answer when you tap the
+bottom right:
+
+robot_clickmap {"image": "iVBORw0KGgo…", "regions": [{"id": "1", "rect": [0, 0, 160, 120]}, {"id": "2", "rect": [160, 0, 160, 120]}, {"id": "3", "rect": [0, 120, 160, 120]}, {"id": "4", "rect": [160, 120, 160, 120]}]}
+  -> {"region": "4", "index": 3, "x": 241, "y": 187}

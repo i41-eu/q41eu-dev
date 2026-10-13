@@ -7,7 +7,7 @@
   <h2 id="calling">Calling an action</h2>
   <p>Every action is <code>POST $SDEV_URL/v1/robots/$SDEV_ROBOT/&lt;action&gt;</code> with its arguments as a JSON object (all optional unless marked required) and your key in <code>Authorization: Bearer sdev_…</code> (a new key on <a href="/robots">Your robots</a>). The same action is the MCP tool <code>robot_&lt;action&gt;</code> at <code>$SDEV_URL/mcp</code>, for AI agents. The calls below use these helpers:</p>
   {{template "code" .Calling}}
-  <p>The answer is <code>{"ok": true, …}</code>, or <code>{"ok": false, "error": "…"}</code> with the status 400 (a wrong argument), 401 (no key, or not a valid one), 404 (not this key's robot), 429 (too many: 10 actions a second per key, bursts of 30), 501 (the robot does not offer it) or 503 (the robot is offline).</p>
+  <p>A request's body is at most 2 MB (a picture as base64 up to about 1.5 MB; Dev fits it to the screen). The answer is <code>{"ok": true, …}</code>, or <code>{"ok": false, "error": "…"}</code> with the status 400 (a wrong argument), 401 (no key, or not a valid one), 404 (not this key's robot), 429 (too many: 10 actions a second per key, bursts of 30), 501 (the robot does not offer it) or 503 (the robot is offline).</p>
   <p>Also: <code>GET /v1/robots</code> (the key's robot), <code>GET /v1/robots/&lt;robot&gt;</code> (its state, as <a href="#state">state</a>), <code>GET /v1/robots/&lt;robot&gt;/events?after=&amp;names=&amp;seconds=</code> (as <a href="#events">events</a>), <code>GET /v1/actions</code> (the actions and their arguments as JSON), and <a href="/v1/openapi.json">/v1/openapi.json</a>: the whole API as OpenAPI 3.1, for API tools and client generators.</p>
 </section>
 
@@ -37,7 +37,7 @@
 
 {{with part "asking"}}<section class="card part">
   <h2 id="{{.ID}}">{{.Name}}</h2>
-  <p>Dev's own: a question and two to four answers as buttons on the screen, with a chime. The call waits for the tap on an answer and returns it, so a script or an agent can ask the person at the robot before it acts.</p>
+  <p>Dev's own, on the touch screen: Dev draws the picture and matches the person's tap to it, and the call waits for the tap and returns it, so a script or an agent can ask the person at the robot before it acts. A <b>question</b> has two to four answers as buttons; a <b>menu</b> two to six tiles, with labels or pictures; a <b>clickmap</b> any places you name (rectangles, circles, polygons) over a picture of yours or over what the screen shows. One waits at a time: a newer one ends the older, which answers <code>replaced</code>. Taps elsewhere change nothing (they still come as <a href="#ev-tap">tap</a> events).</p>
   {{range .Actions}}{{template "action" .}}{{end}}
 </section>{{end}}
 

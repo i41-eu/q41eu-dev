@@ -96,6 +96,7 @@ type robotState struct {
 	seq    int64
 	wake   chan struct{} // closed and replaced on every new event
 	ask    *question
+	acts   int64 // actions run on it (not state or events): a delayed step of an older one is dropped
 }
 
 type seqEvent struct {
@@ -105,11 +106,14 @@ type seqEvent struct {
 
 const maxEvents = 100
 
-// question is an "ask" waiting for a tap on one of its buttons.
+// question is an ask, a menu or a clickmap waiting for a tap on one of its places.
 type question struct {
-	buttons []screen.Button
-	answer  chan int
+	hit    func(x, y int) int // the place at (x, y), or -1
+	answer chan tapped
 }
+
+// tapped is the place tapped (i) and where; i < 0: a newer question took the screen.
+type tapped struct{ i, x, y int }
 
 // New makes the app and loads its state.
 func New(cfg Config) *App {
@@ -330,9 +334,9 @@ func (a *App) robotEvent(r *robothub.Robot, ev wire.RobotEventBody) {
 			}
 			x, _ := e.Data["x"].(float64)
 			y, _ := e.Data["y"].(float64)
-			if i := screen.Hit(q.buttons, int(x), int(y)); i >= 0 {
+			if i := q.hit(int(x), int(y)); i >= 0 {
 				select {
-				case q.answer <- i:
+				case q.answer <- tapped{i, int(x), int(y)}:
 				default:
 				}
 			}

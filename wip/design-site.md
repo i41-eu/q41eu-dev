@@ -463,6 +463,9 @@ from.
 
 ### 7.0 Menus and clickmaps as pictures (step H0, ahead of H1 and H2)
 
+Built (step H0): `menu` and `clickmap` as below, in [docs/site.md](../docs/site.md) and the
+readme; what follows is the design they were built from.
+
 The owner asked for menus, clickmaps and image upload. Their picture versions need nothing the
 steps before H bring (the catalog, scopes, the libraries): Dev draws the picture, as it does for
 `ask`, the robot reports the tap (`tap` x, y) and Dev matches it, so they can come first. What
@@ -799,7 +802,7 @@ Each step is a release that is useful on its own, in this order. Tests: `gofmt`,
 | 8 | **Python library, every action in Go** | q41eu-dev | `sdk/python/q41dev.py` (standard library, one file) at `/sdk/q41dev.py`, the examples on it; `client/actions.go` generated | `TestGenerated`; the Python examples run against a fake robot |
 | 9 | **The example runner** | q41eu-dev | `examples/examples.json`; `TestExamples` runs every example in every language against Dev with a fake robot | itself; CI with sh, python3, node, go |
 | F1–F10 | **The features, one per release** (6.5): F1 screen and stickers with the privacy and pause events; F2 files and image upload; F3 sprites; F4 audio; F5 head extras and the held guard; F6 infrared and sensor switches; F7 `wait_for` and the readings; F8 streams; F9 `screenshot` (after the `0x07` decision); F10 `ping` | q41eu-dev (F9 may need q41eu-raw and the firmware) | per release: the action, its coverage row, snippets in every language (generated), an example, a section of the API by part, a devcheck step | `TestCoverage`, `TestExamples`, devcheck on a real robot with USB screenshots |
-| H0 | **Menus and clickmaps as pictures** (7.0) | q41eu-dev | `menu` and `clickmap`, drawn and matched by Dev; `screen.Menu`, `screen.Region`; the `menu` and `picture` examples; a file picker in Try it | kit unit tests, the app end to end with a fake robot, the site's tests, the browser test, devcheck |
+| H0 | **Menus and clickmaps as pictures** (7.0; built) | q41eu-dev | `menu` and `clickmap`, drawn and matched by Dev; `screen.Menu`, `screen.Region`; the `menu` and `picture` examples; a file picker in Try it | kit unit tests, the app end to end with a fake robot, the site's tests, the browser test, devcheck |
 | H1–H5 | **Helpers, one per release:** H1 menu, H2 clickmap, H3 countdown, H4 sequence, H5 speak | q41eu-dev (kit packages `menu`, `assets`, `scene`, `voice`) | the kit package, Dev's action, library helpers, an example, a docs section | kit unit tests (rendering, hit tests, schedules with a fake clock), `TestExamples`, devcheck |
 | 10 | **Advanced apps** | q41eu-dev | the apps of 5.8 as examples, in every language they fit; the case studies updated with what the kit now has | `TestExamples` |
 | 11 | **`webapp` in the kit** | q41eu-dev | sessions, pairing, sign-in, the manager's reports, the page's event stream; Dev on it first | Dev's app tests unchanged and green |

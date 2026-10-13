@@ -2,7 +2,13 @@ package devapp
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
+	"hash/crc32"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,6 +21,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/i41-eu/q41eu-dev/screen"
 	"github.com/i41-eu/q41eu-raw/robotauth"
 	"github.com/i41-eu/q41eu-raw/sso"
 	"github.com/i41-eu/q41eu-raw/wire"
@@ -544,4 +551,148 @@ func TestSignInPages(t *testing.T) {
 	if res, _ := get(client(), run, false); res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/docs/examples?signin=no#ex-hello" {
 		t.Errorf("Run's sign-in without the hint: %d %q", res.StatusCode, res.Header.Get("Location"))
 	}
+}
+
+// menu and clickmap: a tap on a tile or in a region answers; taps elsewhere do not; a newer one
+// replaces the older; wrong arguments answer 400.
+func TestMenuAndClickmap(t *testing.T) {
+	a := New(Config{RobotToken: "tok", Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Version: "test"})
+	ts := httptest.NewServer(a.Handler())
+	defer ts.Close()
+	a.cfg.PublicURL = ts.URL
+	robot := connectRobot(t, ts.URL)
+	robot.waitFor("pair code", func() bool { return robot.code != "" })
+	jar, _ := cookiejar.New(nil)
+	browser := &http.Client{Jar: jar}
+	browser.Get(ts.URL + "/pair?code=" + robot.code)
+	_, out := post(t, browser, ts.URL+"/api/keys", "", map[string]any{"robot": "chan-1", "name": "test"}, map[string]string{"X-Requested-With": "dev"})
+	key, _ := out["key"].(string)
+	plain := &http.Client{}
+	type result struct {
+		code int
+		out  map[string]any
+	}
+	call := func(action string, args map[string]any) chan result {
+		done := make(chan result, 1)
+		go func() {
+			c, o := post(t, plain, ts.URL+"/v1/robots/chan-1/"+action, key, args, nil)
+			done <- result{c, o}
+		}()
+		return done
+	}
+	answer := func(what string, done chan result) result {
+		t.Helper()
+		select {
+		case r := <-done:
+			return r
+		case <-time.After(4 * time.Second):
+			t.Fatalf("%s: no answer", what)
+		}
+		return result{}
+	}
+	waiting := func() { // the call shows its picture, then waits for a tap
+		t.Helper()
+		for end := time.Now().Add(3 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+			a.mu.Lock()
+			q := a.stateFor("chan-1").ask
+			a.mu.Unlock()
+			if q != nil {
+				return
+			}
+		}
+		t.Fatal("nothing waits for a tap")
+	}
+
+	// A menu: a tap between the tiles does nothing, one on the third tile answers.
+	items := []any{"Apple", map[string]any{"id": "cake", "label": "Cake"}, map[string]any{"id": "carrot", "label": "Carrot", "image": pngBase64(t, 40, 30)}, "Milk"}
+	done := call("menu", map[string]any{"title": "Snack?", "items": items, "timeout_s": 5.0})
+	waiting()
+	_, tiles := screen.Menu("Snack?", []screen.MenuItem{{Label: "Apple"}, {Label: "Cake"}, {Label: "Carrot"}, {Label: "Milk"}}, color.RGBA{})
+	between := tiles[0].Rect.Max.X + 3
+	robot.event("screen_tap", map[string]any{"x": float64(between), "y": float64(tiles[0].Rect.Min.Y + 20)})
+	third := tiles[2].Rect.Min.Add(tiles[2].Rect.Size().Div(2))
+	time.Sleep(50 * time.Millisecond)
+	robot.event("screen_tap", map[string]any{"x": float64(third.X), "y": float64(third.Y)})
+	if r := answer("menu", done); r.code != http.StatusOK || r.out["item"] != "carrot" || r.out["index"] != 2.0 || r.out["label"] != "Carrot" {
+		t.Fatalf("menu: %d %v", r.code, r.out)
+	}
+	// The program's next card stays: the answer's tick does not take it away a moment later.
+	post(t, plain, ts.URL+"/v1/robots/chan-1/show", key, map[string]any{"text": "Carrot, yum!"}, nil)
+	robot.mu.Lock()
+	n := len(robot.cmds)
+	robot.mu.Unlock()
+	time.Sleep(1500 * time.Millisecond)
+	robot.mu.Lock()
+	for _, c := range robot.cmds[n:] {
+		if c.Command == "face" {
+			t.Errorf("the card after a menu was taken away (%v)", robot.cmds[n:])
+		}
+	}
+	robot.mu.Unlock()
+
+	// A clickmap replaces a waiting menu; a tap outside its regions does nothing, one in the circle answers.
+	menu := call("menu", map[string]any{"items": []any{"Yes", "No"}, "timeout_s": 5.0})
+	waiting()
+	regions := []any{map[string]any{"id": "sun", "circle": []any{260.0, 40.0, 30.0}},
+		map[string]any{"id": "hill", "polygon": []any{[]any{0.0, 240.0}, []any{160.0, 140.0}, []any{320.0, 240.0}}}}
+	done = call("clickmap", map[string]any{"image": pngBase64(t, 320, 240), "regions": regions, "timeout_s": 5.0})
+	if r := answer("the replaced menu", menu); r.code != http.StatusOK || r.out["replaced"] != true {
+		t.Fatalf("a menu replaced by a clickmap: %d %v", r.code, r.out)
+	}
+	robot.event("screen_tap", map[string]any{"x": 10.0, "y": 10.0})
+	time.Sleep(50 * time.Millisecond)
+	robot.event("screen_tap", map[string]any{"x": 265.0, "y": 45.0})
+	if r := answer("clickmap", done); r.code != http.StatusOK || r.out["region"] != "sun" || r.out["x"] != 265.0 || r.out["y"] != 45.0 {
+		t.Fatalf("clickmap: %d %v", r.code, r.out)
+	}
+	if r := answer("a clickmap nobody taps", call("clickmap", map[string]any{"regions": regions, "timeout_s": 0.2})); r.out["timed_out"] != true {
+		t.Fatalf("clickmap timed out: %v", r.out)
+	}
+
+	// Wrong arguments: 400, and nothing waits.
+	for _, bad := range []struct {
+		action string
+		args   map[string]any
+	}{
+		{"menu", map[string]any{"items": []any{"One"}}},
+		{"menu", map[string]any{"items": []any{"1", "2", "3", "4", "5", "6", "7"}}},
+		{"menu", map[string]any{"items": []any{"A", map[string]any{"id": "b"}}}},
+		{"menu", map[string]any{"items": []any{"A", map[string]any{"label": "B", "colour": "red"}}}},
+		{"menu", map[string]any{"items": []any{"A", 5.0}}},
+		{"clickmap", map[string]any{"regions": []any{}}},
+		{"clickmap", map[string]any{"regions": []any{map[string]any{"id": "x"}}}},
+		{"clickmap", map[string]any{"regions": []any{map[string]any{"id": "x", "polygon": []any{[]any{0.0, 0.0}, []any{5.0, 5.0}}}}}},
+		{"clickmap", map[string]any{"regions": []any{map[string]any{"id": "x", "rect": []any{0.0, 0.0, 10.0, 10.0}, "circle": []any{5.0, 5.0, 3.0}}}}},
+		{"clickmap", map[string]any{"regions": []any{map[string]any{"id": "x", "rect": []any{0.0, 0.0, 0.0, 10.0}}}}},
+		{"clickmap", map[string]any{"regions": []any{map[string]any{"id": "x", "circle": []any{1.0, 1.0, 1.0}}, map[string]any{"id": "x", "circle": []any{9.0, 9.0, 1.0}}}}},
+		{"clickmap", map[string]any{"image": hugePNG(t), "regions": []any{map[string]any{"id": "x", "circle": []any{5.0, 5.0, 3.0}}}}},
+	} {
+		if code, out := post(t, plain, ts.URL+"/v1/robots/chan-1/"+bad.action, key, bad.args, nil); code != http.StatusBadRequest {
+			t.Errorf("%s %v: %d %v, want 400", bad.action, bad.args, code, out)
+		}
+	}
+	if _, err := decodePicture("image", hugePNG(t)); err == nil || !strings.Contains(err.Error(), "5000x4000 is too big") {
+		t.Errorf("a huge picture: %v", err)
+	}
+}
+
+func pngBase64(t *testing.T, w, h int) string {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for i := range img.Pix {
+		img.Pix[i] = 0xc0
+	}
+	var b bytes.Buffer
+	if err := png.Encode(&b, img); err != nil {
+		t.Fatal(err)
+	}
+	return base64.StdEncoding.EncodeToString(b.Bytes())
+}
+
+// hugePNG is a PNG that says it is 5000x4000 (its picture data is not there: it is refused first).
+func hugePNG(t *testing.T) string {
+	raw, _ := base64.StdEncoding.DecodeString(pngBase64(t, 1, 1))
+	binary.BigEndian.PutUint32(raw[16:], 5000) // IHDR: width, height, then its CRC
+	binary.BigEndian.PutUint32(raw[20:], 4000)
+	binary.BigEndian.PutUint32(raw[29:], crc32.ChecksumIEEE(raw[12:29]))
+	return base64.StdEncoding.EncodeToString(raw)
 }

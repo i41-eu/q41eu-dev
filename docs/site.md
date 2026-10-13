@@ -9,9 +9,9 @@ offline, as dev.q41.eu. What comes next for it is planned in
 | Path | Page | What is on it |
 |---|---|---|
 | `/` | Home | what Dev is, the three steps (robot, key, first program), the hello example in the languages picked with **Run**, links to the rest; the robots paired with this browser, in brief |
-| `/robots` | Your robots | a card per robot paired with this browser: **Try it** (a row of controls per action), **Keys** (new, list, delete), **Events** (live); without a robot, how to pair one (signed in through the manager, or by the robot's QR code) |
+| `/robots` | Your robots | a card per robot paired with this browser: **Try it** (a row of controls per action; a menu from words; a picture from the phone or computer, made 320×240 in the browser first, so nothing else of the photo leaves it), **Keys** (new, list, delete), **Events** (live); without a robot, how to pair one (signed in through the manager, or by the robot's QR code) |
 | `/docs/start` | Getting started | from a robot on the desk to a program driving it (as [getting-started.md](getting-started.md)), the first program's command in each language |
-| `/docs/api` | The API by part | calling an action (the helper per language, the answers and errors), then a section per part of the robot: screen and face, head, LEDs, speaker, questions, what people do (the events, by the sensor that notices them), state and readings, any robot command; each action with its arguments and one call in each language |
+| `/docs/api` | The API by part | calling an action (the helper per language, the answers and errors), then a section per part of the robot: screen and face, head, LEDs, speaker, questions and menus (ask, menu, clickmap), what people do (the events, by the sensor that notices them), state and readings, any robot command; each action with its arguments and one call in each language |
 | `/docs/examples` | Examples | every example in every language (the files themselves, with Copy and Download), the parts of the robot it uses, **Run** |
 | `/docs/case-studies` | Case studies | Focus and Pet side by side (what each is, its size, what it uses of the kit and of the robot), an app compared with a program, the kit's packages and who uses them |
 | `/docs/case-studies/focus`, `/docs/case-studies/pet` | Focus, Pet | one app each, as it is at a tag of its public repository: what the robot and the phone show (its pictures), how it is built (its parts and their lines), what it sends the robot and handles with the same through Dev's actions (or "an app only"), its key code (excerpts, each with a link to its lines at the tag), what it teaches |
@@ -49,7 +49,8 @@ example). **Sign in** in the header signs in for real.
 - **Without JavaScript** every language is shown; the chips, Copy and Run are hidden.
 
 Each code block has its language, how to run it (examples), **Copy**, and **Download** (example
-files). **Run** runs an example on the first robot paired with this browser, through the page's
+files). **Run** runs an example on the first robot paired with this browser (`picture` sends
+`examples/img/quarters.png`, a tap at the robot answers `menu` and `picture`), through the page's
 own session, and shows what it prints: a JavaScript copy of the example's steps, in `site.js`.
 
 ## Search
@@ -122,7 +123,8 @@ own session, and shows what it prints: a JavaScript copy of the example's steps,
 - `TestPagesInBrowser`, in a headless Chrome or Chromium when one is installed (`$CHROME`, or on
   `PATH`; skipped with `-short`): the language selector (all on by default; off by a click and by
   the keyboard; remembered, on another page too; the last one off turns all on; `?lang=` and
-  Keep; tabs; storage blocked), the robot's card (paired by the QR code's link, Try it, a new key,
-  an event, Run), the case studies' code shown whatever the languages picked, the search (`/` to the box, an action found by its name and an example by what
+  Keep; tabs; storage blocked), the robot's card (paired by the QR code's link, Try it, a picture
+  from its file picker, a new key,
+  an event, Run, and Run of menu and picture answered by a tap at the robot), the case studies' code shown whatever the languages picked, the search (`/` to the box, an action found by its name and an example by what
   it does, the arrow keys, Enter, Escape, a synonym, nothing found), and no page, nor the search's
   results, wider than a 390 px phone.

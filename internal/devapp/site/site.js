@@ -165,6 +165,23 @@ const Dev = (() => {
       await call("move", { gesture: "nod" });
       return "passed";
     },
+    menu: async (call, log) => {
+      log("waiting up to 30 s for a tap on a tile on the robot…");
+      const r = await call("menu", { title: "Snack?", items: ["Apple", "Cake", "Carrot", "Milk"] });
+      if (!r.item) return "no choice within 30 s";
+      await call("show", { clear: true }); // the speech bubble is on the face
+      await call("say", { text: r.item + ", yum!" });
+      return r.item;
+    },
+    picture: async (call, log) => {
+      const png = new Uint8Array(await (await fetch("/examples/img/quarters.png")).arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < png.length; i += 0x8000) bin += String.fromCharCode(...png.subarray(i, i + 0x8000));
+      const regions = [0, 1, 2, 3].map((i) => ({ id: String(i + 1), rect: [160 * (i % 2), 120 * Math.floor(i / 2), 160, 120] }));
+      log("waiting up to 30 s for a tap on one of the quarters…");
+      const r = await call("clickmap", { image: btoa(bin), regions });
+      return r.region ? `quarter ${r.region} (at ${r.x}, ${r.y})` : "no tap within 30 s";
+    },
     events: async (call, log, events) => {
       let last = (await events(0, 0)).last_seq;
       log("for 30 s, touch the robot: tap its screen, pat its head, hold a tag near it…");

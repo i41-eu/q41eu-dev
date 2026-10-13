@@ -1,12 +1,12 @@
 // Command devcheck tests Dev end to end on a real robot: it runs every action through the API (as
 // a program would, with SDEV_URL, SDEV_ROBOT and SDEV_KEY), takes the robot's own screenshot over
 // USB after each (i41eu-usb, from i41eu-manager), checks the pixels (the text's colour, the
-// LEDs as the readings screen shows them, a question's buttons) and writes a report with every
-// screenshot: <dir>/index.html.
+// LEDs as the readings screen shows them, a question's buttons, a menu's tiles, a clickmap's
+// picture) and writes a report with every screenshot: <dir>/index.html.
 //
 //	devcheck -usb ./i41eu-usb -o /tmp/devcheck [-tap]
 //
-// -tap also answers a question and makes a tap event with a USB tap (the robot asks once
+// -tap also answers a question, a menu and a clickmap with USB taps (the robot asks once
 // "Let the computer on USB use the screen?" unless it runs a test build). The robot ends on its
 // face with its LEDs off.
 package main
@@ -184,6 +184,42 @@ func steps(tap bool, usbTap func(x, y int) error) []step {
 			return fmt.Sprintf("USB tap at 80,205: %d tap event(s)", len(ev)), err
 		}, checks: []check{share("the answer's card is green", image.Rect(20, 60, 300, 180), green, 0.03)}})
 	}
+	panel := color.RGBA{0x2a, 0x30, 0x50, 255}
+	s = append(s, step{name: "menu (four tiles)", wait: 2 * time.Second, do: func(ctx context.Context, c *client.Client) (string, error) {
+		go c.Menu(context.Background(), "Check: tap 3", client.MenuItem{Label: "1"}, client.MenuItem{Label: "2"},
+			client.MenuItem{Label: "3"}, client.MenuItem{Label: "4"}) // answered below, or it times out
+		return "menu Check: tap 3 / 1, 2, 3, 4", nil
+	}, checks: []check{share("the first tile", image.Rect(20, 60, 140, 100), panel, 0.5), share("the fourth tile", image.Rect(180, 160, 300, 210), panel, 0.5)}})
+	if tap {
+		s = append(s, step{name: "tap the third tile", wait: 500 * time.Millisecond, do: func(ctx context.Context, c *client.Client) (string, error) {
+			return "USB tap at 84,184", usbTap(84, 184)
+		}, checks: []check{share("the choice's card is green", image.Rect(20, 60, 300, 180), green, 0.03)}})
+	}
+	clicked := make(chan client.Tap, 1)
+	s = append(s, step{name: "clickmap (a picture's halves)", wait: time.Second, do: func(ctx context.Context, c *client.Client) (string, error) {
+		go func() {
+			tap, _ := c.Clickmap(context.Background(), redBlue(), client.Region{ID: "left", Rect: []int{0, 0, 160, 240}},
+				client.Region{ID: "right", Rect: []int{160, 0, 160, 240}})
+			clicked <- tap
+		}()
+		return "clickmap left | right over a red | blue picture", nil
+	}, checks: []check{pixel("left half red", image.Pt(80, 120), color.RGBA{255, 0, 0, 255}), pixel("right half blue", image.Pt(240, 120), color.RGBA{0, 0, 255, 255})}})
+	if tap {
+		s = append(s, step{name: "tap the right half", noShot: true, do: func(ctx context.Context, c *client.Client) (string, error) {
+			if err := usbTap(240, 120); err != nil {
+				return "", err
+			}
+			select {
+			case t := <-clicked:
+				if t.Region != "right" {
+					return "", fmt.Errorf("clickmap answered %+v, want right", t)
+				}
+				return fmt.Sprintf("USB tap at 240,120: region %s at %d,%d", t.Region, t.X, t.Y), nil
+			case <-time.After(5 * time.Second):
+				return "", fmt.Errorf("the clickmap did not answer")
+			}
+		}})
+	}
 	s = append(s,
 		step{name: "clear: the face", do: act("show", map[string]any{"clear": true}), wait: time.Second},
 		step{name: "face happy", do: act("face", map[string]any{"emotion": "happy"}), wait: time.Second},
@@ -226,6 +262,11 @@ func steps(tap bool, usbTap func(x, y int) error) []step {
 
 // showPicture sends a picture: red left, blue right.
 func showPicture(ctx context.Context, c *client.Client) (string, error) {
+	return "show image (red | blue PNG)", c.Do(ctx, "show", map[string]any{"image": base64.StdEncoding.EncodeToString(redBlue())}, nil)
+}
+
+// redBlue is a PNG: red left, blue right.
+func redBlue() []byte {
 	img := image.NewRGBA(image.Rect(0, 0, 320, 240))
 	for y := 0; y < 240; y++ {
 		for x := 0; x < 320; x++ {
@@ -238,7 +279,7 @@ func showPicture(ctx context.Context, c *client.Client) (string, error) {
 	}
 	var buf bytes.Buffer
 	png.Encode(&buf, img)
-	return "show image (red | blue PNG)", c.Do(ctx, "show", map[string]any{"image": base64.StdEncoding.EncodeToString(buf.Bytes())}, nil)
+	return buf.Bytes()
 }
 
 func rgb(c color.Color) (int, int, int) {

@@ -8,19 +8,24 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"image/color"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/i41-eu/q41eu-dev/screen"
 	"github.com/i41-eu/q41eu-raw/sso"
+	"github.com/i41-eu/q41eu-raw/wire"
 )
 
 func findChrome() string {
@@ -484,6 +489,46 @@ func TestPagesInBrowser(t *testing.T) {
 		t.Fatalf("Run hello: %+v", ran)
 	}
 	b.noErrors("the robot's card")
+
+	// Run menu and picture: a tap at the robot answers (tapped until it does: the tap must come
+	// once the call waits for it).
+	tapUntil := func(what string, x, y int, js string) {
+		t.Helper()
+		for i := 0; i < 40 && !b.is(js); i++ {
+			robot.event("screen_tap", map[string]any{"x": float64(x), "y": float64(y)})
+			time.Sleep(150 * time.Millisecond)
+		}
+		b.waitFor(what, js)
+	}
+	runOut := func(id string) string {
+		return `document.getElementById("ex-` + id + `").closest("section").querySelector(".out").textContent`
+	}
+	_, tiles := screen.Menu("Snack?", []screen.MenuItem{{Label: "Apple"}, {Label: "Cake"}, {Label: "Carrot"}, {Label: "Milk"}}, color.RGBA{})
+	third := tiles[2].Rect.Min.Add(tiles[2].Rect.Size().Div(2))
+	b.eval(`document.querySelector(".run[data-run=menu]").click()`, nil)
+	tapUntil("the menu answered", third.X, third.Y, runOut("menu")+`.includes("✓ Carrot")`)
+	b.eval(`document.querySelector(".run[data-run=picture]").click()`, nil)
+	tapUntil("the picture's quarter", 240, 180, runOut("picture")+`.includes("✓ quarter 4")`)
+	b.noErrors("Run menu and picture")
+
+	// Try it: a picture from this computer, made 320x240 in the page, on the robot.
+	b.open(ts.URL + "/robots")
+	b.waitFor("the robot's card", `!!document.querySelector("#robots .card .dot.on")`)
+	robot.mu.Lock()
+	n = len(robot.bins)
+	robot.mu.Unlock()
+	var input struct {
+		Result struct {
+			ObjectID string `json:"objectId"`
+		} `json:"result"`
+	}
+	b.call("Runtime.evaluate", map[string]any{"expression": `document.querySelector("#robots input[type=file]")`}, &input)
+	pic, _ := filepath.Abs("../../examples/img/quarters.png")
+	b.call("DOM.setFileInputFiles", map[string]any{"files": []string{pic}, "objectId": input.Result.ObjectID}, nil)
+	b.eval(`[...document.querySelectorAll("#robots button")].find((x) => x.textContent === "Show picture").click()`, nil)
+	robot.waitFor("the picture from Try it", func() bool { return slices.Contains(robot.bins[n:], wire.BinShowJPEG) })
+	b.waitFor("Try it's answer", `document.querySelector("#robots .out").textContent.startsWith("✓ show picture")`)
+	b.noErrors("Try it's picture")
 
 	// The search: "/" goes to the box, results show as you type, Enter opens the first one.
 	firstResult := `(() => { const o = document.querySelector("#q-results [role=option]"); return o && !document.getElementById("q-results").hidden ? o.closest("[role=group]").firstChild.textContent + " " + o.querySelector("b").textContent : ""; })()`

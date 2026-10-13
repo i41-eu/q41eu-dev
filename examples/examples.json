@@ -58,6 +58,44 @@
       }
     },
     {
+      "id": "menu",
+      "title": "menu",
+      "what": "a snack menu of four tiles on the robot; prints the one tapped, and the robot says it",
+      "tags": ["asking", "screen"],
+      "files": {
+        "curl": "curl/menu.sh",
+        "python": "python/menu.py",
+        "js": "js/menu.mjs",
+        "go": "go/menu/main.go",
+        "mcp": "mcp/menu.txt"
+      },
+      "run": {
+        "curl": "sh examples/curl/menu.sh",
+        "python": "python3 examples/python/menu.py",
+        "js": "node examples/js/menu.mjs",
+        "go": "go run ./examples/go/menu"
+      }
+    },
+    {
+      "id": "picture",
+      "title": "picture",
+      "what": "a picture of yours on the robot (or four numbered quarters); prints the quarter tapped",
+      "tags": ["asking", "screen"],
+      "files": {
+        "curl": "curl/picture.sh",
+        "python": "python/picture.py",
+        "js": "js/picture.mjs",
+        "go": "go/picture/main.go",
+        "mcp": "mcp/picture.txt"
+      },
+      "run": {
+        "curl": "sh examples/curl/picture.sh photo.jpg",
+        "python": "python3 examples/python/picture.py photo.jpg",
+        "js": "node examples/js/picture.mjs photo.jpg",
+        "go": "go run ./examples/go/picture photo.jpg"
+      }
+    },
+    {
       "id": "events",
       "title": "events",
       "what": "what people do at the robot; a pat makes it chirp and smile, a tag shows its text",

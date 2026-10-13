@@ -107,6 +107,7 @@ button[aria-pressed=true]#tabsBtn { background: var(--accent); color: var(--acce
 button:disabled { opacity: 0.45; cursor: default; }
 input[type=text], input[type=search], select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); min-width: 0; }
 input[type=text] { flex: 1; }
+input[type=file] { flex: 1; min-width: 0; max-width: 100%; font: inherit; font-size: 0.9rem; }
 input[type=color] { width: 44px; height: 38px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 2px; }
 input[type=range] { flex: 1; accent-color: var(--accent); min-width: 80px; }
 .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }

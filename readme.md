@@ -6,8 +6,9 @@ kit, so a new robot app is a few hundred lines instead of a few thousand.
 - **A script in any language** shows "Build passed" in green on the robot, nods, lights the LEDs
   as a progress bar, plays a chime: one `curl` each, no robot protocol to learn.
 - **An AI agent** (Claude Code or any MCP client) gets a body on your desk: it shows short text,
-  speaks in a bubble, asks you "Deploy now? Yes / Not yet" and gets the button you tapped, and
-  hears when you pat the robot's head or hold a tag near it.
+  speaks in a bubble, asks you "Deploy now? Yes / Not yet" and gets the button you tapped, offers
+  a menu of tiles or a picture to tap, and hears when you pat the robot's head or hold a tag near
+  it.
 - **App authors** (Pet, Focus, the next one) use the same building blocks in Go: the robot
   connection, pairing codes, cards with good text, sounds, LED colours, and what a person did.
 
@@ -89,6 +90,8 @@ API page has a call of each in every language.
 | `leds` | `color`, `bar` 0..1, `pixels` (12), `effect` (rainbow, breathe, chase, blink, off) with `speed`, `seconds`; `off` | the 12 LEDs; screen colours corrected to look the same on the LEDs |
 | `sound` | `chime` (start, done, break_over, chirp, tada, no, hello, morning, lullaby, yawn, whee, munch, ask, yes, error), or `notes` ("C5:120 E5:120 G5:300", `-` a rest) with `bell`; `volume` | a sound, played in parts the robot can buffer |
 | `ask` | `question`, `answers` (2-4) required; `timeout_s` (30, ≤ 120) | the question and buttons on the screen; answers `{"answer", "index"}` when tapped, or `{"timed_out": true}` |
+| `menu` | `items` (2-6: labels, or `{id, label, image}`) required; `title`, `timeout_s` | 2-6 tiles on the screen, with labels or pictures; answers `{"item", "index", "label"}` for the tile tapped, or `{"timed_out": true}` |
+| `clickmap` | `regions` (1-32: `{id, rect}`, `{id, circle}`, `{id, polygon}`) required; `image`, `timeout_s` | places to tap, over a picture or what the screen shows; answers `{"region", "x", "y"}` for the first tap inside one, or `{"timed_out": true}`; the screen stays as it is |
 | `events` | `after` (a seq), `names`, `seconds` (≤ 60) | what people did, after `after`; waits up to `seconds` for the next (also `GET /v1/robots/<robot>/events?after=&names=&seconds=`) |
 | `command` | `command` (required), `args` | any of the robot's own commands ([q41eu-raw](https://github.com/i41-eu/q41eu-raw#commands)), except those that switch its apps, restart it, or turn streams on |
 
@@ -167,10 +170,10 @@ go run ./cmd/q41eu-dev                  # listens on :8785
 - **End to end on a real robot:** `go run ./cmd/devcheck -usb <i41eu-usb> -o report -tap` runs
   every action through the API (`SDEV_*` set), takes the robot's own screenshot over USB after
   each, checks the pixels (the text's colour, the LEDs as the readings screen shows them, a
-  question's buttons, a picture), answers a question with a USB tap, and writes `report/index.html`
-  with every screenshot.
+  question's buttons, a menu's tiles, a picture), answers a question, a menu and a clickmap with
+  USB taps, and writes `report/index.html` with every screenshot.
 - `go test -race ./...` runs the tests: the hub against a fake robot, the app end to end (pairing,
-  keys, actions, a question answered by a tap, events, MCP), the site (every page, every example
+  keys, actions, a question, a menu and a clickmap answered by a tap, events, MCP), the site (every page, every example
   in every language, the links, the search's index), and, with Chrome or Chromium installed, the
   site in a headless browser (the language selector, the search, the robot's card, a phone's
   width; `-short` skips it).

@@ -122,7 +122,24 @@ disconnected at 14:02 and no override runs. It opens when the USB is connected o
 an override." or "The robot is alone: nobody touched it for 12 minutes. It opens when the owner
 taps it." `robot_state` is never refused and has a `presence` object: `allowed`, `reason`, `usb`
 (connected, disconnected or unknown), `usb_reported_at`, `override_until`, `idle_seconds`. The
-HTTP API is not gated: the rule is about the agent, which comes through MCP.
+HTTP API is not gated, except listen (below): the rule is about the agent, which comes through MCP.
+
+**Listen** (`POST /v1/robots/{id}/listen`, body optional: `{"seconds": N}`, 1 to 30, default 30; any
+other value is 400): the robot's microphone for one person's tap, answered as sound to the HTTP
+caller (a program on the person's computer). It is a route, not an action, so there is no MCP
+tool: audio never goes to an agent. The key or paired browser must be the robot's (another robot
+is 404). It is refused in this order: the robot is offline (503) or has no `mic` command (501);
+the presence gate is closed (403, with the presence sentence above); nobody tapped the robot
+("Nobody tapped the robot: listen starts only within 10 seconds of a tap on its screen or a pat on
+its head.", 403: the tap or pat must be at most 10 seconds old, and one tap opens one listen);
+the robot is already listening (409, "The robot is already listening."). Then Dev turns the mic
+on and collects the first channel of the robot's sound until the first of: a second tap or pat on
+the robot; `seconds` of sound received (counted in samples, not by the clock); the caller going
+away; `seconds` + 5 s of wall-clock time. The mic is always turned off at the end. The answer is
+200, `audio/wav`: a 44-byte RIFF header, PCM, 1 channel, 16000 Hz, 16 bit (resampled by linear
+interpolation from the robot's rate). When no sound came at all it is 504, "The robot sent no
+sound: its mic may be blocked at night (22:00 to 07:00)." The audio is kept in memory only for
+the call and never stored.
 
 - Events that count as a person's act: `tap`, `long_press`, `pat`, `pet`, `stroke`, `shaken`,
   `picked_up`, `tag`, `tag_removed`, `remote`, `button` (an answer to `robot_ask` is a `tap`). The

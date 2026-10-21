@@ -99,7 +99,9 @@ type robotState struct {
 	seq    int64
 	wake   chan struct{} // closed and replaced on every new event
 	ask    *question
-	acts   int64 // actions run on it (not state or events): a delayed step of an older one is dropped
+	acts   int64     // actions run on it (not state or events): a delayed step of an older one is dropped
+	tapAt  time.Time // the last tap or pat not yet used to start a listen (listen.go)
+	lis    *listener // the listen running on it
 }
 
 type seqEvent struct {
@@ -132,6 +134,7 @@ func New(cfg Config) *App {
 		Connected:    a.connected,
 		Disconnected: func(r *robothub.Robot) { a.publish("robot", a.robotInfo(r.ID())) },
 		Event:        a.robotEvent,
+		Binary:       a.binary,
 		Paired:       a.paired,
 		Owner:        a.setOwner,
 	})
@@ -337,6 +340,15 @@ func (a *App) robotEvent(r *robothub.Robot, ev wire.RobotEventBody) {
 		if slices.Contains(personActs, e.Name) {
 			a.markPerson(r.ID())
 			break
+		}
+	}
+	for _, e := range events {
+		if e.Name == "tap" || e.Name == "pat" {
+			if rs.lis != nil { // a tap while listening ends the listen, and is not the start of the next
+				ping(rs.lis.stop)
+			} else {
+				rs.tapAt = a.now()
+			}
 		}
 	}
 	if q := rs.ask; q != nil {

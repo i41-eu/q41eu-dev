@@ -192,7 +192,27 @@ func TestListen(t *testing.T) {
 	checkWAV("seconds 1", wait(ch), 16000)
 	robot.waitFor("mic off", func() bool { return robot.micsLocked(false) == 2 })
 
-	// 6. never an MCP tool.
+	// 6. a second listen while one runs is 409; then the USB goes away mid-listen: the listen ends
+	// with presence's sentence, no WAV, and the mic is off.
+	usb("connected")
+	touch()
+	ch = listen(`{}`)
+	robot.waitFor("mic on", func() bool { return robot.micsLocked(true) == 3 })
+	robot.bin(wire.BinAudioMulti, audioFrame(24000, 800, 1000, -1000))
+	a.mu.Lock()
+	a.stateFor("chan-1").tapAt = clock.Now()
+	a.mu.Unlock()
+	refused("already listening", wait(listen(`{}`)), http.StatusConflict, "The robot is already listening.")
+	usb("disconnected")
+	robot.bin(wire.BinAudioMulti, audioFrame(24000, 800, 1000, -1000))
+	r = wait(ch)
+	refused("presence closes mid-listen", r, http.StatusForbidden, "The owner is not with the robot")
+	if r.header.Get("Content-Type") == "audio/wav" {
+		t.Errorf("presence closes mid-listen: audio was returned")
+	}
+	robot.waitFor("mic off", func() bool { return robot.micsLocked(false) == 3 })
+
+	// 7. never an MCP tool.
 	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/list"}`))
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Content-Type", "application/json")
@@ -205,4 +225,13 @@ func TestListen(t *testing.T) {
 	if strings.Contains(string(raw), "listen") || strings.Contains(string(raw), "robot_mic") {
 		t.Errorf("tools/list names listen or the mic: %s", raw)
 	}
+
+	// 8. the robot drops its connection mid-listen: 503 within a few seconds, not after 35 s.
+	usb("connected")
+	touch()
+	ch = listen(`{}`)
+	robot.waitFor("mic on", func() bool { return robot.micsLocked(true) == 4 })
+	robot.bin(wire.BinAudioMulti, audioFrame(24000, 800, 1000, -1000))
+	robot.ws.Close()
+	refused("robot drops", wait(ch), http.StatusServiceUnavailable, "The robot went offline while listening.")
 }

@@ -154,6 +154,14 @@ func post(t *testing.T, c *http.Client, url, key string, body any, hdr map[strin
 	return res.StatusCode, out
 }
 
+// openGate: the owner sets an override, so the presence gate lets show and menu through for the key.
+func openGate(t *testing.T, c *http.Client, url, key string) {
+	t.Helper()
+	if code, o := post(t, c, url+"/v1/robots/chan-1/presence", key, map[string]any{"override_minutes": 30}, nil); code != http.StatusOK {
+		t.Fatalf("open the gate: %d %v", code, o)
+	}
+}
+
 func TestDevApp(t *testing.T) {
 	a := New(Config{RobotToken: "tok", Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Version: "test"})
 	ts := httptest.NewServer(a.Handler())
@@ -181,6 +189,7 @@ func TestDevApp(t *testing.T) {
 
 	// Programs: no key, no robot; with it, actions.
 	plain := &http.Client{}
+	openGate(t, plain, ts.URL, key)
 	if code, _ := post(t, plain, ts.URL+"/v1/robots/chan-1/show", "", map[string]any{"text": "x"}, nil); code != http.StatusUnauthorized {
 		t.Fatalf("without a key: %d", code)
 	}
@@ -606,6 +615,7 @@ func TestMenuAndClickmap(t *testing.T) {
 	_, out := post(t, browser, ts.URL+"/api/keys", "", map[string]any{"robot": "chan-1", "name": "test"}, map[string]string{"X-Requested-With": "dev"})
 	key, _ := out["key"].(string)
 	plain := &http.Client{}
+	openGate(t, plain, ts.URL, key)
 	type result struct {
 		code int
 		out  map[string]any

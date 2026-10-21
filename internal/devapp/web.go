@@ -344,6 +344,10 @@ func (a *App) handleAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if reason := a.gateHTTP(acc, r.PathValue("id"), r.PathValue("action")); reason != "" {
+		writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": reason})
+		return
+	}
 	out, err := a.run(r.Context(), acc, r.PathValue("id"), r.PathValue("action"), in)
 	if err != nil {
 		writeErr(w, err)

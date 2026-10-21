@@ -122,7 +122,14 @@ disconnected at 14:02 and no override runs. It opens when the USB is connected o
 an override." or "The robot is alone: nobody touched it for 12 minutes. It opens when the owner
 taps it." `robot_state` is never refused and has a `presence` object: `allowed`, `reason`, `usb`
 (connected, disconnected or unknown), `usb_reported_at`, `override_until`, `idle_seconds`. The
-HTTP API is not gated, except listen and speak (below): the rule is about the agent, which comes through MCP.
+HTTP API is gated only in these routes: `POST /v1/robots/{id}/show` and `/menu` called with an API key
+(`Authorization: Bearer`) answer 403 `{"ok": false, "error": "<the same sentence as MCP>"}` and nothing
+reaches the robot while the gate is closed, and listen and speak (below). Why: defense in depth, so a
+program that forgets to check `GET .../presence` first is still stopped; `pm-robot` keeps its own check.
+The paired browser (session cookie) is the owner's own hands and is not gated; every other HTTP action
+(say, ask, leds, sound, command, state, ...) is unchanged, because the rule is about the agent, which comes through MCP.
+The `curl` example above that uses `show` (and any script that uses `show` or `menu`) therefore needs
+the owner present: the USB connected or an override, and a recent touch.
 
 **Listen** (`POST /v1/robots/{id}/listen`, body optional: `{"seconds": N}`, 1 to 30, default 30; any
 other value is 400): the robot's microphone for one person's tap, answered as sound to the HTTP

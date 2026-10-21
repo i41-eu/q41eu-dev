@@ -117,6 +117,19 @@ func (a *App) gate(id, tool string) string {
 	return ""
 }
 
+// gatedHTTP are the HTTP actions an API key may not run while the owner is away (as the MCP tools);
+// the paired browser is the owner's own hands and is never gated.
+var gatedHTTP = []string{"show", "menu"}
+
+// gateHTTP: the refusal for an HTTP action by an API key, or "" when it may run. A robot the key
+// does not own is left to run, which answers 404 as before (no presence leaks).
+func (a *App) gateHTTP(acc access, id, action string) string {
+	if acc.key == nil || !slices.Contains(acc.robots, id) || !slices.Contains(gatedHTTP, action) {
+		return ""
+	}
+	return a.gate(id, action)
+}
+
 // handlePresence: POST sets what the watcher or the owner reports, GET answers the object.
 // It is a route, not an action: every action is an MCP tool, and an agent must not open its own gate.
 func (a *App) handlePresence(w http.ResponseWriter, r *http.Request) {

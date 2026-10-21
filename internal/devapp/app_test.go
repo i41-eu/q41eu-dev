@@ -48,7 +48,7 @@ func connectRobot(t *testing.T, url string) *robotSim {
 	t.Cleanup(func() { ws.Close() })
 	s := &robotSim{t: t, ws: ws}
 	reg, _ := wire.Marshal(wire.KindRegister, wire.Meta{}, wire.RegisterBody{Class: wire.ClassRobot,
-		Capabilities: wire.RobotCapabilities{Model: "sim", Commands: []string{"image", "say", "nod", "look", "leds", "face", "speaker", "sticker", "server_switch"}}})
+		Capabilities: wire.RobotCapabilities{Model: "sim", Commands: []string{"image", "say", "nod", "look", "leds", "face", "speaker", "sticker", "server_switch", "mic"}}})
 	ws.WriteMessage(websocket.TextMessage, reg)
 	go func() {
 		for {
@@ -82,6 +82,29 @@ func connectRobot(t *testing.T, url string) *robotSim {
 func (s *robotSim) event(name string, data map[string]any) {
 	b, _ := wire.Marshal(wire.KindRobotEvent, wire.Meta{}, wire.RobotEventBody{Name: name, Data: data})
 	s.ws.WriteMessage(websocket.TextMessage, b)
+}
+
+// bin sends a binary message to Dev: the kind byte, then the payload.
+func (s *robotSim) bin(kind byte, payload []byte) {
+	s.ws.WriteMessage(websocket.BinaryMessage, append([]byte{kind}, payload...))
+}
+
+// mics counts the mic commands the robot got with on (or off).
+func (s *robotSim) mics(on bool) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.micsLocked(on)
+}
+
+// micsLocked is mics with s.mu held (inside waitFor).
+func (s *robotSim) micsLocked(on bool) int {
+	n := 0
+	for _, c := range s.cmds {
+		if v, _ := c.Args["on"].(bool); c.Command == "mic" && v == on {
+			n++
+		}
+	}
+	return n
 }
 
 func (s *robotSim) waitFor(what string, ok func() bool) {

@@ -166,6 +166,61 @@ func TestPresenceGate(t *testing.T) {
 	if code, o := post(t, plain, ts.URL+"/v1/robots/chan-1/say", key, map[string]any{"text": "program"}, nil); code != http.StatusOK {
 		t.Fatalf("REST while the gate is closed: %d %v", code, o)
 	}
+	// show and menu over HTTP with an API key are gated too (defense in depth): the same sentence as MCP,
+	// nothing reaches the robot; the paired browser is the owner's own hands and is not gated.
+	showBody := map[string]any{"text": "hello"}
+	menuBody := map[string]any{"items": []any{"Yes", "No"}, "timeout_s": 0.2}
+	cmdNames := func() []string {
+		robot.mu.Lock()
+		defer robot.mu.Unlock()
+		var n []string
+		for _, c := range robot.cmds {
+			n = append(n, c.Command)
+		}
+		return n
+	}
+	probe := func(text string) {
+		t.Helper()
+		before := len(cmdNames())
+		if code, o := post(t, plain, ts.URL+"/v1/robots/chan-1/say", key, map[string]any{"text": text}, nil); code != http.StatusOK {
+			t.Fatalf("probe say: %d %v", code, o)
+		}
+		robot.waitFor("the probe say", func() bool { return len(robot.cmds) > before })
+	}
+	probe("before")
+	sent := len(cmdNames())
+	mcpShow, mcpMenu := text(tool("robot_show", `{"text":"hello"}`)), text(tool("robot_menu", `{"items":["Yes","No"]}`))
+	if mcpShow == "" || mcpShow != mcpMenu {
+		t.Fatalf("MCP refusals: %q %q", mcpShow, mcpMenu)
+	}
+	for _, act := range []string{"show", "menu"} {
+		body := showBody
+		if act == "menu" {
+			body = menuBody
+		}
+		code, o := post(t, plain, ts.URL+"/v1/robots/chan-1/"+act, key, body, nil)
+		if code != http.StatusForbidden || o["ok"] != false || o["error"] != mcpShow {
+			t.Fatalf("HTTP %s with the key while closed: %d %v, want 403 and %q", act, code, o, mcpShow)
+		}
+	}
+	probe("after")
+	for _, c := range cmdNames()[sent:] {
+		if c != "say" {
+			t.Fatalf("a %q command reached the robot while the gate was closed", c)
+		}
+	}
+	if code, o := post(t, browser, ts.URL+"/v1/robots/chan-1/show", "", showBody, map[string]string{"X-Requested-With": "dev"}); code != http.StatusOK {
+		t.Fatalf("browser show while closed: %d %v", code, o)
+	}
+	report(map[string]any{"override_minutes": 30}) // opens it
+	if code, o := post(t, plain, ts.URL+"/v1/robots/chan-1/show", key, showBody, nil); code != http.StatusOK {
+		t.Fatalf("HTTP show with the key while open: %d %v", code, o)
+	}
+	if code, o := post(t, plain, ts.URL+"/v1/robots/chan-1/menu", key, menuBody, nil); code != http.StatusOK {
+		t.Fatalf("HTTP menu with the key while open: %d %v", code, o)
+	}
+	report(map[string]any{"override_off": true}) // closed again for the rest
+
 	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/robots/chan-1/presence", nil)
 	req.Header.Set("Authorization", "Bearer "+key)
 	res, err := plain.Do(req)

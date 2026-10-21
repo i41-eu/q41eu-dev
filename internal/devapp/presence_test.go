@@ -107,7 +107,8 @@ func TestPresenceGate(t *testing.T) {
 		refusal string // part of the sentence the refusal says
 	}{
 		{"no report: the USB is unknown", func() {}, false, "not with the robot"},
-		{"usb connected", func() { report(map[string]any{"usb": "connected"}) }, true, ""},
+		{"first report after a start: connected is not a person's act", func() { report(map[string]any{"usb": "connected"}) }, false, "nobody has touched it"},
+		{"a touch opens it", func() { touch() }, true, ""},
 		{"11 minutes with no robot event: alone", func() { clock.advance(11 * time.Minute); report(map[string]any{"usb": "connected"}) }, false, "The robot is alone: nobody touched it for 11 minutes"},
 		{"a touch opens it again", func() { touch() }, true, ""},
 		{"usb disconnected", func() { report(map[string]any{"usb": "disconnected"}) }, false, "the USB was disconnected at 14:11"},
@@ -144,6 +145,13 @@ func TestPresenceGate(t *testing.T) {
 			if _, ok := p[k]; !ok {
 				t.Fatalf("%s: presence has no %q: %v", s.name, k, p)
 			}
+		}
+	}
+
+	// an override is 1 to 240 minutes: less or more is refused and changes nothing.
+	for _, m := range []float64{0.01, 0.5, 241, -5} {
+		if code := report(map[string]any{"override_minutes": m}); code != http.StatusBadRequest {
+			t.Fatalf("override_minutes %v: %d, want 400", m, code)
 		}
 	}
 

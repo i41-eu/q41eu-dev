@@ -147,7 +147,7 @@ func (a *App) handlePresence(w http.ResponseWriter, r *http.Request) {
 	case in.USB != "" && in.USB != "connected" && in.USB != "disconnected":
 		writeErr(w, fmt.Errorf("usb: connected or disconnected"))
 		return
-	case in.OverrideMinutes < 0 || in.OverrideMinutes > maxOverrideMins:
+	case in.OverrideMinutes != 0 && (in.OverrideMinutes < 1 || in.OverrideMinutes > maxOverrideMins):
 		writeErr(w, fmt.Errorf("override_minutes: 1 to %d", maxOverrideMins))
 		return
 	case in.USB == "" && in.OverrideMinutes == 0 && !in.OverrideOff:
@@ -160,8 +160,8 @@ func (a *App) handlePresence(w http.ResponseWriter, r *http.Request) {
 	if in.USB != "" {
 		if in.USB != p.usb {
 			p.usbSince = now
-			if in.USB == "connected" {
-				p.act = now // plugging in is a person's act; a heartbeat is not
+			if in.USB == "connected" && p.usb == "disconnected" {
+				p.act = now // plugging in is a person's act; a heartbeat and a first report after a start are not
 			}
 		}
 		p.usb, p.usbAt = in.USB, now

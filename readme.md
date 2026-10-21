@@ -113,8 +113,9 @@ be calm: it sits next to a person who may be working").
 **Presence** (the gate on the MCP tools): an AI agent may use the robot only while the owner is
 with it. Over MCP every `robot_` tool except `robot_state` is refused unless (the USB is
 connected, reported in the last 3 minutes, **or** an override runs) **and** a person acted on the
-robot in the last 10 minutes. Plugging the USB in and setting an override count as a person's
-act; a repeated "connected" does not. No report for 3 minutes means the USB is unknown, so no;
+robot in the last 10 minutes. Plugging the USB in (a change from "disconnected" to "connected")
+and setting an override count as a person's act; a repeated "connected", and the first report
+after a Dev restart, do not. No report for 3 minutes means the USB is unknown, so no;
 after a Dev restart the gate is closed until the next report. A refusal is a tool result with
 `isError: true` and one sentence, for example "The owner is not with the robot: the USB was
 disconnected at 14:02 and no override runs. It opens when the USB is connected or the owner sets

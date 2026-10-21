@@ -135,7 +135,11 @@ its head.", 403: the tap or pat must be at most 10 seconds old, and one tap open
 the robot is already listening (409, "The robot is already listening."). Then Dev turns the mic
 on and collects the first channel of the robot's sound until the first of: a second tap or pat on
 the robot; `seconds` of sound received (counted in samples, not by the clock); the caller going
-away; `seconds` + 5 s of wall-clock time. The mic is always turned off at the end. The answer is
+away; `seconds` + 5 s of wall-clock time. Two things end it without sound: the presence gate
+closing during the listen (403, the presence sentence, no audio) and the robot's connection ending
+or being replaced (503, "The robot went offline while listening."); only frames from the connection
+the listen started on count, and the mic is turned off on both connections if the robot came back.
+The mic is always turned off at the end. The answer is
 200, `audio/wav`: a 44-byte RIFF header, PCM, 1 channel, 16000 Hz, 16 bit (resampled by linear
 interpolation from the robot's rate). When no sound came at all it is 504, "The robot sent no
 sound: its mic may be blocked at night (22:00 to 07:00)." The audio is kept in memory only for

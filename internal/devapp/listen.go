@@ -29,11 +29,12 @@ const (
 
 // listener collects the channel-0 samples of one listen (a.mu).
 type listener struct {
-	want    int           // seconds asked for
-	rate    int           // the sample rate of the first frame; 0 = none yet
-	samples []int16       // channel 0, at most want*rate
-	wake    chan struct{} // after samples came (buffer 1)
-	stop    chan struct{} // a tap or pat after the mic went on (buffer 1)
+	rb      *robothub.Robot // the connection the listen started on; only its frames count
+	want    int             // seconds asked for
+	rate    int             // the sample rate of the first frame; 0 = none yet
+	samples []int16         // channel 0, at most want*rate
+	wake    chan struct{}   // after samples came (buffer 1)
+	stop    chan struct{}   // a tap or pat after the mic went on (buffer 1)
 }
 
 func ping(c chan struct{}) {
@@ -66,6 +67,9 @@ func (a *App) binary(r *robothub.Robot, kind byte, payload []byte) {
 		return
 	}
 	l := rs.lis
+	if l.rb != r { // frames of another connection than the one the listen started on
+		return
+	}
 	if l.rate == 0 {
 		l.rate = rate
 	}
@@ -135,7 +139,7 @@ func (a *App) handleListen(w http.ResponseWriter, r *http.Request) {
 		refuse(w, http.StatusConflict, "The robot is already listening.")
 		return
 	}
-	l := &listener{want: seconds, wake: make(chan struct{}, 1), stop: make(chan struct{}, 1)}
+	l := &listener{rb: rb, want: seconds, wake: make(chan struct{}, 1), stop: make(chan struct{}, 1)}
 	rs.tapAt = time.Time{} // one tap opens one listen
 	rs.lis = l
 	a.mu.Unlock()
@@ -152,6 +156,9 @@ func (a *App) handleListen(w http.ResponseWriter, r *http.Request) {
 		}
 		a.mu.Unlock()
 		rb.Command("mic", map[string]any{"on": false})
+		if cur := a.hub.Robot(id); cur != nil && cur != rb { // the robot came back on a new connection
+			cur.Command("mic", map[string]any{"on": false})
+		}
 	}
 	defer end()
 	if !rb.Command("mic", map[string]any{"on": true}) {
@@ -161,6 +168,13 @@ func (a *App) handleListen(w http.ResponseWriter, r *http.Request) {
 
 	limit := time.NewTimer(time.Duration(seconds)*time.Second + listenSlack)
 	defer limit.Stop()
+	// closed says whether the owner is no longer with the robot; the reason is presence's sentence.
+	closed := func() (bool, string) {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		ok, reason := a.presenceOf(id).check(a.now())
+		return !ok, reason
+	}
 wait:
 	for {
 		select {
@@ -168,6 +182,11 @@ wait:
 			a.mu.Lock()
 			full := l.rate > 0 && len(l.samples) >= l.want*l.rate
 			a.mu.Unlock()
+			if no, reason := closed(); no {
+				end()
+				refuse(w, http.StatusForbidden, reason)
+				return
+			}
 			if full {
 				break wait
 			}
@@ -175,11 +194,19 @@ wait:
 			break wait
 		case <-limit.C:
 			break wait
+		case <-rb.Done():
+			end()
+			refuse(w, http.StatusServiceUnavailable, "The robot went offline while listening.")
+			return
 		case <-r.Context().Done():
 			return
 		}
 	}
 	end()
+	if no, reason := closed(); no {
+		refuse(w, http.StatusForbidden, reason)
+		return
+	}
 	a.mu.Lock()
 	rate, samples := l.rate, slices.Clone(l.samples)
 	a.mu.Unlock()

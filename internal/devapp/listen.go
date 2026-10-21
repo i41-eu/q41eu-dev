@@ -25,6 +25,12 @@ const (
 	listenSlack   = 5 * time.Second  // wall-clock time beyond the seconds asked for
 	wavRate       = 16000
 	noSoundReason = "The robot sent no sound: its mic may be blocked at night (22:00 to 07:00)."
+
+	// loudRMS is the RMS (of 32767) from which a 20 ms window counts as loud. It is a first guess
+	// for the robot's mic, to be tuned on the real robot.
+	loudRMS      = 500
+	speechTenths = 3  // tenths of a second of loud windows before quiet can end a listen
+	quietTenths  = 15 // tenths of a second of quiet windows in a row that end it
 )
 
 // listener collects the channel-0 samples of one listen (a.mu).
@@ -35,6 +41,34 @@ type listener struct {
 	samples []int16         // channel 0, at most want*rate
 	wake    chan struct{}   // after samples came (buffer 1)
 	stop    chan struct{}   // a tap or pat after the mic went on (buffer 1)
+
+	quietEnd bool  // the quiet end is on
+	quiet    bool  // the quiet end came: samples after it are dropped
+	winN     int   // samples in the current window
+	winSq    int64 // their squares, summed
+	loud     int   // samples in loud windows so far
+	still    int   // samples in the quiet windows in a row
+}
+
+// hear measures one sample (a.mu): in windows of rate/50 samples (20 ms) a window is loud when its
+// RMS is at least loudRMS. Speech first: only after speechSeconds of loud windows in total does
+// quietSeconds of quiet windows in a row end the listen (quiet = true).
+func (l *listener) hear(s int16) {
+	l.winN++
+	l.winSq += int64(s) * int64(s)
+	if l.winN < l.rate/50 {
+		return
+	}
+	if l.winSq >= int64(loudRMS)*int64(loudRMS)*int64(l.winN) {
+		l.loud += l.winN
+		l.still = 0
+	} else {
+		l.still += l.winN
+	}
+	l.winN, l.winSq = 0, 0
+	if l.quietEnd && l.loud*10 >= l.rate*speechTenths && l.still*10 >= l.rate*quietTenths {
+		l.quiet = true
+	}
 }
 
 func ping(c chan struct{}) {
@@ -76,8 +110,10 @@ func (a *App) binary(r *robothub.Robot, kind byte, payload []byte) {
 	if rate != l.rate {
 		return
 	}
-	for i := 0; i < n && len(l.samples) < l.want*l.rate; i++ {
-		l.samples = append(l.samples, int16(binary.LittleEndian.Uint16(data[i*2*ch:])))
+	for i := 0; i < n && len(l.samples) < l.want*l.rate && !l.quiet; i++ {
+		s := int16(binary.LittleEndian.Uint16(data[i*2*ch:]))
+		l.samples = append(l.samples, s)
+		l.hear(s)
 	}
 	ping(l.wake)
 }
@@ -94,12 +130,13 @@ func (a *App) handleListen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Seconds *int `json:"seconds"`
+		Seconds  *int  `json:"seconds"`
+		QuietEnd *bool `json:"quiet_end"`
 	}
 	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<16))
 	if len(strings.TrimSpace(string(body))) > 0 {
 		if err := json.Unmarshal(body, &in); err != nil {
-			writeErr(w, fmt.Errorf("the body: a JSON object with seconds, a whole number (%v)", err))
+			writeErr(w, fmt.Errorf("the body: a JSON object with seconds, a whole number, and quiet_end, true or false (%v)", err))
 			return
 		}
 	}
@@ -139,7 +176,7 @@ func (a *App) handleListen(w http.ResponseWriter, r *http.Request) {
 		refuse(w, http.StatusConflict, "The robot is already listening.")
 		return
 	}
-	l := &listener{rb: rb, want: seconds, wake: make(chan struct{}, 1), stop: make(chan struct{}, 1)}
+	l := &listener{rb: rb, want: seconds, quietEnd: in.QuietEnd == nil || *in.QuietEnd, wake: make(chan struct{}, 1), stop: make(chan struct{}, 1)}
 	rs.tapAt = time.Time{} // one tap opens one listen
 	rs.lis = l
 	a.mu.Unlock()
@@ -180,7 +217,7 @@ wait:
 		select {
 		case <-l.wake:
 			a.mu.Lock()
-			full := l.rate > 0 && len(l.samples) >= l.want*l.rate
+			full := l.quiet || l.rate > 0 && len(l.samples) >= l.want*l.rate
 			a.mu.Unlock()
 			if no, reason := closed(); no {
 				end()

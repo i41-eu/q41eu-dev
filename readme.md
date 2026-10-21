@@ -134,8 +134,8 @@ the presence gate is closed (403, with the presence sentence above); nobody tapp
 its head.", 403: the tap or pat must be at most 10 seconds old, and one tap opens one listen);
 the robot is already listening (409, "The robot is already listening."). Then Dev turns the mic
 on and collects the first channel of the robot's sound until the first of: a second tap or pat on
-the robot; `seconds` of sound received (counted in samples, not by the clock); the caller going
-away; `seconds` + 5 s of wall-clock time. Two things end it without sound: the presence gate
+the robot; `seconds` of sound received (counted in samples, not by the clock); 1.5 s of quiet after speech
+(the quiet end, below); the caller going away; `seconds` + 5 s of wall-clock time. Two things end it without sound: the presence gate
 closing during the listen (403, the presence sentence, no audio) and the robot's connection ending
 or being replaced (503, "The robot went offline while listening."); only frames from the connection
 the listen started on count, and the mic is turned off on both connections if the robot came back.
@@ -144,6 +144,14 @@ The mic is always turned off at the end. The answer is
 interpolation from the robot's rate). When no sound came at all it is 504, "The robot sent no
 sound: its mic may be blocked at night (22:00 to 07:00)." The audio is kept in memory only for
 the call and never stored.
+
+The quiet end lets a person tap once, speak, and stop: no second tap. Dev measures the first
+channel in windows of 20 ms; a window is loud when its RMS is at least 500 (of 32767; a first guess
+for the robot's mic, to be tuned on the real robot). The quiet end arms after 0.3 s of loud windows
+in total, so a breath before speaking never ends it. Then 1.5 s of quiet windows in a row ends the
+listen (counted in samples); the answer keeps the sound up to that end, the trailing quiet
+included, and later sound is dropped. Body field `quiet_end`, true by default; `{"quiet_end": false}`
+switches it off, so only the other ends apply (any other type is 400).
 
 - Events that count as a person's act: `tap`, `long_press`, `pat`, `pet`, `stroke`, `shaken`,
   `picked_up`, `tag`, `tag_removed`, `remote`, `button` (an answer to `robot_ask` is a `tap`). The

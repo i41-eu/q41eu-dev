@@ -2,6 +2,7 @@ package devapp
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"io"
@@ -214,6 +215,139 @@ func TestSpeak(t *testing.T) {
 	}
 	if after != 16000 {
 		t.Errorf("replace: %d samples after the second flush, want exactly the second line's 16000", after)
+	}
+	if flushes != 2 {
+		t.Errorf("replace: %d speaker_flush entries, want 2 (the older speak sends none)", flushes)
+	}
+
+	// 3b. every gate is watched for as long as the speaker is in use.
+	speakCtx := func(ctx context.Context, body []byte) <-chan answer {
+		ch := make(chan answer, 1)
+		go func() {
+			req, _ := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/v1/robots/chan-1/speak", bytes.NewReader(body))
+			req.Header.Set("Authorization", "Bearer "+key)
+			req.Header.Set("Content-Type", "audio/wav")
+			res, err := plain.Do(req)
+			if err != nil {
+				ch <- answer{err: err}
+				return
+			}
+			defer res.Body.Close()
+			b, _ := io.ReadAll(res.Body)
+			ch <- answer{code: res.StatusCode, body: b}
+		}()
+		return ch
+	}
+	frames := func(from int) int {
+		n := 0
+		for _, e := range speakerLog(from) {
+			if e.cmd == "" {
+				n++
+			}
+		}
+		return n
+	}
+	waitFrames := func(from, n int) {
+		t.Helper()
+		for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
+			if frames(from) >= n {
+				return
+			}
+		}
+		t.Fatalf("no %d frames in 5 s", n)
+	}
+	openPresence := func() {
+		t.Helper()
+		post(t, plain, ts.URL+"/v1/robots/chan-1/presence", key, map[string]any{"usb": "disconnected"}, nil)
+		post(t, plain, ts.URL+"/v1/robots/chan-1/presence", key, map[string]any{"usb": "connected"}, nil)
+		robot.event("screen_tap", map[string]any{"x": 5.0, "y": 5.0})
+	}
+	// stopped checks the log since from: the first flush, frames, then exactly one more flush within
+	// 0.3 s of the stop, and nothing after it.
+	stopped := func(name string, from int, stopAt time.Time) {
+		t.Helper()
+		time.Sleep(300 * time.Millisecond)
+		l := speakerLog(from)
+		flushAt, nflush := -1, 0
+		for i, e := range l {
+			if e.cmd == "speaker_flush" {
+				if nflush++; nflush == 2 {
+					flushAt = i
+				}
+			}
+		}
+		if flushAt < 0 {
+			t.Errorf("%s: %d speaker_flush entries, want a second one when it stops", name, nflush)
+			return
+		}
+		if d := l[flushAt].at.Sub(stopAt); d > 300*time.Millisecond {
+			t.Errorf("%s: the flush came %v after the stop, want within 0.3 s", name, d)
+		}
+		if nflush != 2 || flushAt != len(l)-1 {
+			t.Errorf("%s: %d flushes and %d entries after the second flush, want one flush and nothing after", name, nflush, len(l)-1-flushAt)
+		}
+	}
+
+	// a) presence closes during a pacing wait of a long WAV.
+	openPresence()
+	start = mark()
+	ch := speak(testWAV(16000, 1, 16, 5))
+	waitFrames(start, 5)
+	time.Sleep(150 * time.Millisecond)
+	closeAt := time.Now()
+	post(t, plain, ts.URL+"/v1/robots/chan-1/presence", key, map[string]any{"usb": "disconnected"}, nil)
+	r = wait(ch)
+	if e, _ := obj(r)["error"].(string); r.code != http.StatusForbidden || !strings.Contains(e, "The owner is not with the robot") {
+		t.Errorf("a) presence closes in a pacing wait: %d %s, want 403 with presence's sentence", r.code, r.body)
+	}
+	stopped("a) presence closes in a pacing wait", start, closeAt)
+
+	// b) presence closes after the last piece was sent.
+	openPresence()
+	start = mark()
+	ch = speak(testWAV(16000, 1, 16, 1))
+	waitFrames(start, 2)
+	time.Sleep(150 * time.Millisecond)
+	closeAt = time.Now()
+	post(t, plain, ts.URL+"/v1/robots/chan-1/presence", key, map[string]any{"usb": "disconnected"}, nil)
+	r = wait(ch)
+	if e, _ := obj(r)["error"].(string); r.code != http.StatusForbidden || !strings.Contains(e, "The owner is not with the robot") {
+		t.Errorf("b) presence closes in the tail: %d %s, want 403 with presence's sentence", r.code, r.body)
+	}
+	stopped("b) presence closes in the tail", start, closeAt)
+
+	// c) the caller cancels during a pacing wait.
+	openPresence()
+	start = mark()
+	ctx, cancel := context.WithCancel(context.Background())
+	ch = speakCtx(ctx, testWAV(16000, 1, 16, 5))
+	waitFrames(start, 5)
+	time.Sleep(150 * time.Millisecond)
+	closeAt = time.Now()
+	cancel()
+	<-ch // the caller left: an error is the answer
+	stopped("c) the caller leaves in a pacing wait", start, closeAt)
+
+	// d) the caller cancels in the tail.
+	start = mark()
+	ctx, cancel = context.WithCancel(context.Background())
+	ch = speakCtx(ctx, testWAV(16000, 1, 16, 1))
+	waitFrames(start, 2)
+	time.Sleep(150 * time.Millisecond)
+	closeAt = time.Now()
+	cancel()
+	<-ch // the caller left: an error is the answer
+	stopped("d) the caller leaves in the tail", start, closeAt)
+
+	// f) the happy path answers when the robot has played the sound, not before.
+	start = mark()
+	began := time.Now()
+	r = wait(speak(testWAV(16000, 1, 16, 1)))
+	if d := time.Since(began); d < 800*time.Millisecond {
+		t.Errorf("f) 1 s speak answered after %v, want at least 0.8 s", d)
+	}
+	if o := obj(r); r.code != http.StatusOK || o["ok"] != true || o["seconds"] != 1.0 {
+		t.Errorf("f) 1 s speak: %d %s, want 200 ok seconds 1", r.code, r.body)
 	}
 
 	// 4. wrong files: stereo, 8-bit, not a WAV, 61 s.

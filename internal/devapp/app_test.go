@@ -35,6 +35,14 @@ type robotSim struct {
 	cmds []wire.RobotCommandBody
 	bins []byte
 	code string
+	log  []simEntry // commands and speaker frames, in the order they arrived
+}
+
+// simEntry is one thing the fake robot got: a command (cmd), or a speaker frame (cmd empty).
+type simEntry struct {
+	cmd     string
+	at      time.Time
+	samples int // of a speaker frame
 }
 
 func connectRobot(t *testing.T, url string) *robotSim {
@@ -48,7 +56,7 @@ func connectRobot(t *testing.T, url string) *robotSim {
 	t.Cleanup(func() { ws.Close() })
 	s := &robotSim{t: t, ws: ws}
 	reg, _ := wire.Marshal(wire.KindRegister, wire.Meta{}, wire.RegisterBody{Class: wire.ClassRobot,
-		Capabilities: wire.RobotCapabilities{Model: "sim", Commands: []string{"image", "say", "nod", "look", "leds", "face", "speaker", "sticker", "server_switch", "mic"}}})
+		Capabilities: wire.RobotCapabilities{Model: "sim", Commands: []string{"image", "say", "nod", "look", "leds", "face", "speaker", "sticker", "server_switch", "mic", "speaker_flush"}}})
 	ws.WriteMessage(websocket.TextMessage, reg)
 	go func() {
 		for {
@@ -59,6 +67,9 @@ func connectRobot(t *testing.T, url string) *robotSim {
 			s.mu.Lock()
 			if mt == websocket.BinaryMessage {
 				s.bins = append(s.bins, data[0])
+				if data[0] == wire.BinSpeakerPCM && len(data) >= 3 {
+					s.log = append(s.log, simEntry{at: time.Now(), samples: (len(data) - 3) / 2})
+				}
 			} else if frames, err := wire.Parse(data); err == nil {
 				for _, f := range frames {
 					switch f.Kind {
@@ -66,6 +77,7 @@ func connectRobot(t *testing.T, url string) *robotSim {
 						var c wire.RobotCommandBody
 						f.Decode(&c)
 						s.cmds = append(s.cmds, c)
+						s.log = append(s.log, simEntry{cmd: c.Command, at: time.Now()})
 					case wire.KindPairCode:
 						var pc wire.PairCodeBody
 						f.Decode(&pc)

@@ -288,6 +288,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/robots/{id}/presence", a.handlePresence) // not an action: see presence.go
 	mux.HandleFunc("POST /v1/robots/{id}/presence", a.handlePresence)
 	mux.HandleFunc("POST /v1/robots/{id}/listen", a.handleListen) // not an action: audio never goes to an agent (listen.go)
+	mux.HandleFunc("POST /v1/robots/{id}/speak", a.handleSpeak)   // not an action: audio never goes to an agent (speak.go)
 	mux.HandleFunc("POST /v1/robots/{id}/{action}", a.handleAction)
 	mux.HandleFunc("GET /v1/actions", a.handleActions)
 	mux.HandleFunc("GET /v1/openapi.json", a.handleOpenAPI)

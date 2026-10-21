@@ -122,7 +122,7 @@ disconnected at 14:02 and no override runs. It opens when the USB is connected o
 an override." or "The robot is alone: nobody touched it for 12 minutes. It opens when the owner
 taps it." `robot_state` is never refused and has a `presence` object: `allowed`, `reason`, `usb`
 (connected, disconnected or unknown), `usb_reported_at`, `override_until`, `idle_seconds`. The
-HTTP API is not gated, except listen (below): the rule is about the agent, which comes through MCP.
+HTTP API is not gated, except listen and speak (below): the rule is about the agent, which comes through MCP.
 
 **Listen** (`POST /v1/robots/{id}/listen`, body optional: `{"seconds": N}`, 1 to 30, default 30; any
 other value is 400): the robot's microphone for one person's tap, answered as sound to the HTTP
@@ -152,6 +152,25 @@ in total, so a breath before speaking never ends it. Then 1.5 s of quiet windows
 listen (counted in samples); the answer keeps the sound up to that end, the trailing quiet
 included, and later sound is dropped. Body field `quiet_end`, true by default; `{"quiet_end": false}`
 switches it off, so only the other ends apply (any other type is 400).
+
+**Speak** (`POST /v1/robots/{id}/speak`): a WAV played on the robot's speaker, for a program on the
+person's computer (for example a voice made there). The body is the WAV file itself
+(`Content-Type: audio/wav`, at most 4 MB, over it is 400): PCM, 1 channel, 16 bit, 8000 to 48000
+Hz, at most 60 seconds, with sound in it; anything else is 400 with one sentence ("speak takes a
+16-bit mono PCM WAV ..."). Dev resamples it to 16000 Hz. It is a route, not an action, so there is
+no MCP tool: audio never goes to an agent. The key or paired browser must be the robot's (another
+robot is 404). It is refused in this order: the robot is offline (503) or lacks `speaker` or
+`speaker_flush` (501); the presence gate is closed (403, the presence sentence): the robot speaks
+only while the owner is with it. No tap is needed. Dev sends `speaker_flush` first, every time, so
+a new line replaces what is still queued on the robot, then the sound in pieces of at most 0.5 s,
+paced so that at most about 3 s of audio is queued on the robot (a piece is sent only when the
+queue plus the piece is at most 2.5 s). A new speak on the same robot replaces a running one: the
+old call stops at once and answers 200 `{"ok": true, "replaced": true}`. If the presence gate
+closes during a speak, Dev flushes the speaker, stops and answers 403 with the presence sentence;
+if the robot's connection ends, the answer is 503, "The robot went offline while speaking."; a
+caller that goes away stops it. The answer after the last piece is sent is 200
+`{"ok": true, "seconds": 5.0}` (the audio's length, to 0.01); it does not wait for the robot to
+finish playing.
 
 - Events that count as a person's act: `tap`, `long_press`, `pat`, `pet`, `stroke`, `shaken`,
   `picked_up`, `tag`, `tag_removed`, `remote`, `button` (an answer to `robot_ask` is a `tap`). The

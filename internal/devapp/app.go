@@ -94,14 +94,15 @@ type apiKey struct {
 
 // robotState is what the app knows of a robot while it runs (not saved).
 type robotState struct {
-	rec    gesture.Recognizer
-	events []seqEvent // the last maxEvents
-	seq    int64
-	wake   chan struct{} // closed and replaced on every new event
-	ask    *question
-	acts   int64     // actions run on it (not state or events): a delayed step of an older one is dropped
-	tapAt  time.Time // the last tap or pat not yet used to start a listen (listen.go)
-	lis    *listener // the listen running on it
+	rec      gesture.Recognizer
+	events   []seqEvent // the last maxEvents
+	seq      int64
+	wake     chan struct{} // closed and replaced on every new event
+	ask      *question
+	acts     int64     // actions run on it (not state or events): a delayed step of an older one is dropped
+	tapAt    time.Time // the last tap or pat not yet used to start a listen (listen.go)
+	lis      *listener // the listen running on it
+	speakSeq int64     // the number of the newest speak; an older one stops (speak.go)
 }
 
 type seqEvent struct {

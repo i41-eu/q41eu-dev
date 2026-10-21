@@ -110,6 +110,30 @@ actions): for API tools and client generators. For Go there is [`client`](client
 tools above, on the key's robot, with instructions for the agent ("keep text on its screen short,
 be calm: it sits next to a person who may be working").
 
+**Presence** (the gate on the MCP tools): an AI agent may use the robot only while the owner is
+with it. Over MCP every `robot_` tool except `robot_state` is refused unless (the USB is
+connected, reported in the last 3 minutes, **or** an override runs) **and** a person acted on the
+robot in the last 10 minutes. Plugging the USB in and setting an override count as a person's
+act; a repeated "connected" does not. No report for 3 minutes means the USB is unknown, so no;
+after a Dev restart the gate is closed until the next report. A refusal is a tool result with
+`isError: true` and one sentence, for example "The owner is not with the robot: the USB was
+disconnected at 14:02 and no override runs. It opens when the USB is connected or the owner sets
+an override." or "The robot is alone: nobody touched it for 12 minutes. It opens when the owner
+taps it." `robot_state` is never refused and has a `presence` object: `allowed`, `reason`, `usb`
+(connected, disconnected or unknown), `usb_reported_at`, `override_until`, `idle_seconds`. The
+HTTP API is not gated: the rule is about the agent, which comes through MCP.
+
+- Events that count as a person's act: `tap`, `long_press`, `pat`, `pet`, `stroke`, `shaken`,
+  `picked_up`, `tag`, `tag_removed`, `remote`, `button` (an answer to `robot_ask` is a `tap`). The
+  agent's own calls, `connected`, `near`, `away`, `plugged` and `unplugged` do not.
+- `POST /v1/robots/<robot>/presence` with `{"usb": "connected"}`, `{"usb": "disconnected"}`,
+  `{"override_minutes": 30}` (1 to 240) or `{"override_off": true}`; `GET` on the same path
+  answers the presence object. It is a route, not an action, so there is no MCP tool for it: an
+  agent must not open its own gate. A key of that robot or a paired browser may call it (403 for
+  another robot); the laptop's USB watcher uses a key of its own ("laptop presence"). Known gap:
+  any key of the robot can call it; the agent's key is kept from it only by how it is handed
+  out. Per-key scopes come later.
+
 **Keys** belong to one robot each, and only a browser paired with it (by its QR code) makes them.
 Dev keeps only their SHA-256; the page lists them with when each was last used, and deletes them.
 A robot with a key counts as used: it shows Dev, not its QR screen. For a robot set up by a

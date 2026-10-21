@@ -240,6 +240,9 @@ func TestDevApp(t *testing.T) {
 	if len(tools) != len(Actions) || tools[1].(map[string]any)["name"] != "robot_show" {
 		t.Fatalf("tools: %v", tools)
 	}
+	if code, out := post(t, plain, ts.URL+"/v1/robots/chan-1/presence", key, map[string]any{"usb": "connected"}, nil); code != http.StatusOK { // the owner is with the robot
+		t.Fatalf("presence: %d %v", code, out)
+	}
 	call := mcp(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"robot_say","arguments":{"text":"Hi from an agent"}}}`)
 	if r := call["result"].(map[string]any); r["isError"] == true {
 		t.Fatalf("say: %v", r)

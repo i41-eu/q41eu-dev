@@ -57,6 +57,7 @@ func init() {
 				info := a.robotInfo(id)
 				ev, _, _ := a.eventsAfter(id, 0, nil)
 				info["last_events"] = ev[max(0, len(ev)-10):]
+				info["presence"] = a.presenceObject(id)
 				return info, nil
 			}},
 		{Name: "show", Example: `{"title": "Build", "text": "All tests pass", "color": "green", "progress": 1}`,

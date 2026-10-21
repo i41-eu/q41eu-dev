@@ -43,6 +43,7 @@ type Config struct {
 	TrustedProxies int
 	Log            *slog.Logger
 	Version        string
+	Now            func() time.Time // the clock of the presence gate (presence.go); nil = time.Now; tests set it
 }
 
 // App holds everything; one mutex guards it (robot sockets only queue messages).
@@ -56,6 +57,8 @@ type App struct {
 	dirty  bool
 	robots map[string]*robotState
 	subs   map[*subscriber]struct{}
+
+	presences map[string]*presence // per robot: is the owner with it (presence.go)
 
 	actions   *buckets       // per key or browser
 	pairFails *buckets       // wrong pairing codes per address
@@ -120,7 +123,7 @@ func New(cfg Config) *App {
 	if cfg.Log == nil {
 		cfg.Log = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
-	a := &App{cfg: cfg, log: cfg.Log, robots: map[string]*robotState{}, subs: map[*subscriber]struct{}{},
+	a := &App{cfg: cfg, log: cfg.Log, robots: map[string]*robotState{}, subs: map[*subscriber]struct{}{}, presences: map[string]*presence{},
 		actions: newBuckets(actionsPerSecond, actionsBurst), pairFails: newBuckets(pairFailsPer10m/600.0, pairFailsPer10m),
 		streams: map[string]int{},
 		st:      state{Sessions: map[string]*session{}, Keys: map[string]*apiKey{}, Owners: map[string]string{}}}
@@ -279,6 +282,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/robots", a.handleRobots)
 	mux.HandleFunc("GET /v1/robots/{id}", a.handleRobot)
 	mux.HandleFunc("GET /v1/robots/{id}/events", a.handleRobotEvents)
+	mux.HandleFunc("GET /v1/robots/{id}/presence", a.handlePresence) // not an action: see presence.go
+	mux.HandleFunc("POST /v1/robots/{id}/presence", a.handlePresence)
 	mux.HandleFunc("POST /v1/robots/{id}/{action}", a.handleAction)
 	mux.HandleFunc("GET /v1/actions", a.handleActions)
 	mux.HandleFunc("GET /v1/openapi.json", a.handleOpenAPI)
@@ -327,6 +332,12 @@ func (a *App) robotEvent(r *robothub.Robot, ev wire.RobotEventBody) {
 	a.mu.Lock()
 	rs := a.stateFor(r.ID())
 	events := rs.rec.Feed(ev, time.Now())
+	for _, e := range events {
+		if slices.Contains(personActs, e.Name) {
+			a.markPerson(r.ID())
+			break
+		}
+	}
 	if q := rs.ask; q != nil {
 		for _, e := range events {
 			if e.Name != "tap" {

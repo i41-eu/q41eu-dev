@@ -114,7 +114,7 @@ func TestPresenceGate(t *testing.T) {
 		{"override 30 minutes with the USB disconnected", func() { report(map[string]any{"override_minutes": 30}) }, true, ""},
 		{"override past its end", func() { clock.advance(31 * time.Minute); touch() }, false, "no override runs"},
 		{"usb connected again", func() { report(map[string]any{"usb": "connected"}) }, true, ""},
-		{"usb connected but the last report is 4 minutes old", func() { clock.advance(4 * time.Minute); touch() }, false, "no report in the last 3 minutes"},
+		{"usb connected but the last report is 4 minutes old", func() { clock.advance(4 * time.Minute); touch() }, false, "no report of the USB in the last 3 minutes"},
 		{"a heartbeat renews the report", func() { report(map[string]any{"usb": "connected"}) }, true, ""},
 		{"override off ends it", func() {
 			report(map[string]any{"usb": "disconnected"})

@@ -127,6 +127,9 @@ func (a *App) mcpCall(r *http.Request, acc access, req rpcRequest) (any, *rpcErr
 		if p.Arguments == nil {
 			p.Arguments = args{}
 		}
+		if refusal := a.gate(acc.robots[0], p.Name); refusal != "" { // the owner is not with the robot (presence.go)
+			return map[string]any{"content": []map[string]any{{"type": "text", "text": refusal}}, "isError": true}, nil
+		}
 		out, err := a.run(r.Context(), acc, acc.robots[0], name, p.Arguments)
 		if err != nil { // a tool's failure is a result the agent reads, not a protocol error
 			return map[string]any{"content": []map[string]any{{"type": "text", "text": err.Error()}}, "isError": true}, nil

@@ -166,11 +166,13 @@ a new line replaces what is still queued on the robot, then the sound in pieces 
 paced so that at most about 3 s of audio is queued on the robot (a piece is sent only when the
 queue plus the piece is at most 2.5 s). A new speak on the same robot replaces a running one: the
 old call stops at once and answers 200 `{"ok": true, "replaced": true}`. If the presence gate
-closes during a speak, Dev flushes the speaker, stops and answers 403 with the presence sentence;
-if the robot's connection ends, the answer is 503, "The robot went offline while speaking."; a
-caller that goes away stops it. The answer after the last piece is sent is 200
-`{"ok": true, "seconds": 5.0}` (the audio's length, to 0.01); it does not wait for the robot to
-finish playing.
+closes at any time while the sound is queued or playing (also during a pacing wait or after the
+last piece), Dev flushes the speaker once within 0.1 s, sends nothing more and answers 403 with the
+presence sentence; a caller that goes away does the same flush and stop (no answer to send). A
+replaced call sends no flush. If the robot's connection ends, the answer is 503, "The robot went
+offline while speaking.". The answer comes only when the robot has played the sound (by the pacing
+clock: the first piece's time plus the audio's length), while presence is still watched: 200
+`{"ok": true, "seconds": 5.0}` (the audio's length, to 0.01).
 
 - Events that count as a person's act: `tap`, `long_press`, `pat`, `pet`, `stroke`, `shaken`,
   `picked_up`, `tag`, `tag_removed`, `remote`, `button` (an answer to `robot_ask` is a `tap`). The

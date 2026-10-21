@@ -51,8 +51,8 @@ type listener struct {
 }
 
 // hear measures one sample (a.mu): in windows of rate/50 samples (20 ms) a window is loud when its
-// RMS is at least loudRMS. Speech first: only after speechSeconds of loud windows in total does
-// quietSeconds of quiet windows in a row end the listen (quiet = true).
+// RMS is at least loudRMS. Speech first: only after speechTenths of loud windows in total does
+// quietTenths of quiet windows in a row end the listen (quiet = true).
 func (l *listener) hear(s int16) {
 	l.winN++
 	l.winSq += int64(s) * int64(s)

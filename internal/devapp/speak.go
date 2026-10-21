@@ -22,8 +22,9 @@ import (
 const (
 	maxSpeakBody   = 4 << 20 // bytes of WAV
 	maxSpeakSecs   = 60
-	speakFrameSecs = 0.5 // seconds of audio in one speaker message
-	speakAheadSecs = 2.5 // before a frame, queued audio plus the frame is at most this
+	speakFrameSecs = 0.5                    // seconds of audio in one speaker message
+	speakAheadSecs = 2.5                    // before a frame, queued audio plus the frame is at most this
+	speakWatch     = 100 * time.Millisecond // the longest the gates go unchecked while the speaker is in use
 	wavSentence    = "speak takes a 16-bit mono PCM WAV, 8000 to 48000 Hz, up to 60 seconds."
 )
 
@@ -75,8 +76,10 @@ func parseWAV(b []byte) ([]int16, error) {
 	return nil, errWAV
 }
 
-// handleSpeak: POST a WAV as the body (audio/wav, at most 4 MB); the answer comes after the last
-// piece is sent, not after the robot has played it.
+// handleSpeak: POST a WAV as the body (audio/wav, at most 4 MB); the answer comes when the robot
+// has played the sound (by the pacing clock). Until then presence, the caller and the robot's
+// connection are watched; presence closing or the caller leaving flushes the speaker once and
+// stops (gl:readme.md#the-api).
 func (a *App) handleSpeak(w http.ResponseWriter, r *http.Request) {
 	acc, ok := a.authed(w, r)
 	if !ok {
@@ -126,6 +129,63 @@ func (a *App) handleSpeak(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// watch checks every gate once, under a.mu: false means the call is over and the answer is
+	// written. Only a call that is still the current one flushes: a replaced one stays silent,
+	// its successor has flushed already.
+	offline := func() {
+		refuse(w, http.StatusServiceUnavailable, "The robot went offline while speaking.")
+	}
+	watch := func() bool {
+		select {
+		case <-rb.Done():
+			offline()
+			return false
+		default:
+		}
+		a.mu.Lock()
+		if rs.speakSeq != mine {
+			a.mu.Unlock()
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "replaced": true})
+			return false
+		}
+		if ok, reason := a.presenceOf(id).check(a.now()); !ok {
+			rb.Command("speaker_flush", nil)
+			a.mu.Unlock()
+			refuse(w, http.StatusForbidden, reason)
+			return false
+		}
+		select {
+		case <-r.Context().Done():
+			rb.Command("speaker_flush", nil)
+			a.mu.Unlock()
+			return false
+		default:
+		}
+		a.mu.Unlock()
+		return true
+	}
+	// sleep waits d, running watch at least every speakWatch; false means the call is over.
+	sleep := func(d time.Duration) bool {
+		end := time.Now().Add(d)
+		for {
+			left := time.Until(end)
+			if left <= 0 {
+				return true
+			}
+			t := time.NewTimer(min(left, speakWatch))
+			select {
+			case <-t.C:
+			case <-r.Context().Done():
+				t.Stop()
+			case <-rb.Done():
+				t.Stop()
+			}
+			if !watch() {
+				return false
+			}
+		}
+	}
+
 	per := int(speakFrameSecs * sound.Rate)
 	var first time.Time
 	queuedSamples := 0 // sent so far
@@ -134,49 +194,34 @@ func (a *App) handleSpeak(w http.ResponseWriter, r *http.Request) {
 		if !first.IsZero() {
 			queued := float64(queuedSamples)/sound.Rate - time.Since(first).Seconds()
 			if wait := max(queued, 0) + float64(len(piece))/sound.Rate - speakAheadSecs; wait > 0 {
-				t := time.NewTimer(time.Duration(wait * float64(time.Second)))
-				select {
-				case <-t.C:
-				case <-r.Context().Done():
-					t.Stop()
-					return
-				case <-rb.Done():
-					t.Stop()
-					refuse(w, http.StatusServiceUnavailable, "The robot went offline while speaking.")
+				if !sleep(time.Duration(wait * float64(time.Second))) {
 					return
 				}
 			}
 		}
-		a.mu.Lock()
-		if rs.speakSeq != mine {
-			a.mu.Unlock()
-			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "replaced": true})
+		if !watch() {
 			return
 		}
-		if ok, reason := a.presenceOf(id).check(a.now()); !ok {
-			rb.Command("speaker_flush", nil)
+		a.mu.Lock()
+		if rs.speakSeq != mine { // replaced between the check and here
 			a.mu.Unlock()
-			refuse(w, http.StatusForbidden, reason)
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "replaced": true})
 			return
 		}
 		sentPiece := rb.Binary(wire.BinSpeakerPCM, sound.Message(piece))
 		a.mu.Unlock()
 		if !sentPiece {
-			refuse(w, http.StatusServiceUnavailable, "The robot went offline while speaking.")
+			offline()
 			return
 		}
 		if first.IsZero() {
 			first = time.Now()
 		}
 		queuedSamples += len(piece)
-		select {
-		case <-r.Context().Done():
-			return
-		case <-rb.Done():
-			refuse(w, http.StatusServiceUnavailable, "The robot went offline while speaking.")
-			return
-		default:
-		}
+	}
+	// The tail: the robot plays on until the pacing clock says the last sample is out.
+	if !sleep(time.Until(first.Add(time.Duration(float64(len(pcm)) / sound.Rate * float64(time.Second))))) {
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "seconds": math.Round(float64(len(pcm))*100/sound.Rate) / 100})
 }
